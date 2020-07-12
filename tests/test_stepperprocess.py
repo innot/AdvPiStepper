@@ -1,3 +1,4 @@
+import sys
 from unittest import TestCase
 
 from advpistepper.stepper import *
@@ -177,10 +178,45 @@ class TestStepperProcess(TestCase):
         self.assertEqual(-1800, self.process.target_position)
 
     def test_continous(self):
-        pass
+        self.process.continous(CW)
+        self.assertEqual(float('inf'), self.process.target_position)
+        # check that the delay calculation works with infinity
+        delay = self.process.calcuate_delay()
+        self.assertTrue(0 < delay < sys.maxsize)
+        self.assertEqual(ACCEL, self.process.cd.state)
+
+        # reset state
+        self.process.cd = ControllerData()
+
+        self.process.continous(CCW)
+        self.assertEqual(float('-inf'), self.process.target_position)
+        delay = self.process.calcuate_delay()
+        self.assertTrue(0 < delay < sys.maxsize)
+        self.assertEqual(ACCEL, self.process.cd.state)
 
     def test_stop(self):
-        pass
+        # fake a move
+        self.process.cd.current_direction = CW
+        self.process.cd.state = ACCEL
+        self.process.cd.c_n = 1000
+        self.process.cd.step = 1000
+        self.process.cd.speed = 1000
+
+        self.process.target_position = 123456
+        self.process.current_position = 0
+        self.process.calcuate_delay()
+
+        self.process.stop()
+        self.assertEqual(self.process.cd.decel_steps, self.process.target_position)
+
+        # CCW
+        self.process.cd.current_direction = CCW
+        self.process.target_position = -123456
+        self.process.current_position = 0
+        self.process.calcuate_delay()
+
+        self.process.stop()
+        self.assertEqual(-self.process.cd.decel_steps, self.process.target_position)
 
     def test_hardstop(self):
         pass

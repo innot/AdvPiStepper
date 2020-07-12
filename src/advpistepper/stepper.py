@@ -615,7 +615,7 @@ class StepperProcess(Process):
         result = Result(noun, value)
         self.r_pipe.send(result)
 
-    def busy_loop(self):
+    def busy_loop_todo(self):
 
         self.pi.wave_clear()
         next_wave_id = -1

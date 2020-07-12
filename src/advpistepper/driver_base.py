@@ -34,7 +34,7 @@ class DriverBase(object):
         """Flag to indicate that the driver has been initialized and the
         GPIO pins have been set up."""
 
-        self._pi: pigpio.pi = None
+        self._pi = None
         """pigpio handle. This value is set when the init() method is called from the
         stepper controller with a pigpio reference."""
 
