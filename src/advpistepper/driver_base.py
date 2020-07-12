@@ -22,9 +22,10 @@ class DriverBase(object):
         MICROSTEP_DEFAULT: 1
     }
 
-    def __init__(self, parameters: Dict[str, Any] = {}):
+    def __init__(self, parameters: Dict[str, Any] = None):
         self._parameters: Dict[str, Any] = self.defaults  # default values
-        self._parameters.update(parameters)  # replace defaults with custom values
+        if parameters is not None:
+            self._parameters.update(parameters)  # replace defaults with custom values
 
         self._direction: int = CW
         """Direction of movement, either CW (1), CCW (-1)."""
@@ -33,10 +34,9 @@ class DriverBase(object):
         """Flag to indicate that the driver has been initialized and the
         GPIO pins have been set up."""
 
-        self._pi: pigpio.pi = pigpio.pi()
-        """pigpio handle. By default connect to the local pigpio server.
-        This value is overwritten when the init() method is called from the
-        stepper controller with a seperate pigpio handle """
+        self._pi: pigpio.pi = None
+        """pigpio handle. This value is set when the init() method is called from the
+        stepper controller with a pigpio reference."""
 
         self._microsteps = self.parameters[MICROSTEP_DEFAULT]
 

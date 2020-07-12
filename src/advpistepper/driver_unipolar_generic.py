@@ -1,4 +1,4 @@
-from advpistepper.driver_base import *
+from .driver_base import *
 
 WAVE = 0
 FULLSTEP = 1
@@ -46,7 +46,7 @@ class UnipolarDriver(DriverBase):
         [1, 0, 0, 0],
     ])
 
-    def __init__(self, a1, a2, b1, b2, parameters: Dict[str, Any] = {}):
+    def __init__(self, a1, a2, b1, b2, parameters: Dict[str, Any] = None):
         """
         :param a1: GPIO pin number for coil A+ (pigpio numbering)
         :type a1:int
@@ -61,7 +61,8 @@ class UnipolarDriver(DriverBase):
         """
 
         p: Dict[str, Any] = self.defaults  # default values
-        p.update(parameters)  # replace defaults with custom values
+        if parameters is not None:
+            p.update(parameters)  # replace defaults with custom values
 
         super().__init__(p)
 

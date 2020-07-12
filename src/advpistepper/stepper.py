@@ -125,24 +125,29 @@ class Noun(Enum):
 
 @dataclass
 class Command(object):
+    """Command object passed from the Frontend to the background Process."""
     verb: Verb = None
-    noun = None
+    noun: Noun = None
 
-    def __init__(self, verb, noun):
+    def __init__(self, verb: Verb, noun: Noun):
         self.verb = verb
         self.noun = noun
 
 
 @dataclass
 class Result(object):
+    """Result object passed from the background Process to the frontend."""
     noun: Noun = None
     value = None
+
+    def __init__(self, noun: Noun, value):
+        self.noun = noun
+        self.value = value
 
 
 @dataclass
 class Statistics(object):
     number_of_steps: int = 0
-
     runtime: int = 0
 
 
@@ -375,7 +380,7 @@ class AdvPigpioStepper(object):
 class StepperProcess(Process):
 
     def __init__(self, command_pipe: Pipe, results_pipe: Pipe, driver: DriverBase, pi: pigpio.pi,
-                 parameters: Dict[str, Any] = {}):
+                 parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
         # store the arguments
@@ -385,7 +390,8 @@ class StepperProcess(Process):
         self.pi = pi
 
         self.params: Dict[str, Any] = driver.parameters  # default values
-        self.params.update(parameters)  # replace defaults with custom values
+        if parameters is not None:
+            self.params.update(parameters)  # replace defaults with custom values
 
         # set up the internal data
         self.cd = ControllerData()
