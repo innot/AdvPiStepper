@@ -372,11 +372,10 @@ class AdvPigpioStepper(object):
         self._driver.set_direction(self._cd.current_direction)
 
 
-
 class StepperProcess(Process):
 
     def __init__(self, command_pipe: Pipe, results_pipe: Pipe, driver: DriverBase, pi: pigpio.pi,
-                 parameters: Dict[str, Any] = None):
+                 parameters: Dict[str, Any] = {}):
         super(StepperProcess, self).__init__()
 
         # store the arguments
@@ -385,11 +384,8 @@ class StepperProcess(Process):
         self.driver = driver
         self.pi = pi
 
-        p = driver.parameters
-        if parameters is not None:
-            self.params: Dict[str, Any] = {**p, **parameters}
-        else:
-            self.params = p
+        self.params: Dict[str, Any] = driver.parameters  # default values
+        self.params.update(parameters)  # replace defaults with custom values
 
         # set up the internal data
         self.cd = ControllerData()
@@ -734,4 +730,3 @@ class StepperProcess(Process):
         print(f"{delta_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
 
         return int(data.c_n)
-

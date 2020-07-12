@@ -46,7 +46,7 @@ class UnipolarDriver(DriverBase):
         [1, 0, 0, 0],
     ])
 
-    def __init__(self, a1, a2, b1, b2, parameters=None):
+    def __init__(self, a1, a2, b1, b2, parameters: Dict[str, Any] = {}):
         """
         :param a1: GPIO pin number for coil A+ (pigpio numbering)
         :type a1:int
@@ -60,10 +60,8 @@ class UnipolarDriver(DriverBase):
         :type parameters: dict, optional
         """
 
-        if parameters is not None:
-            p: Dict[str, Any] = {**self.defaults, **parameters}
-        else:
-            p = self.defaults
+        p: Dict[str, Any] = self.defaults  # default values
+        p.update(parameters)  # replace defaults with custom values
 
         super().__init__(p)
 

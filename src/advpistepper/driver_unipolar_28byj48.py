@@ -55,7 +55,7 @@ class Driver28BYJ48(UnipolarDriver):
         MICROSTEP_DEFAULT: HALFSTEP
     }
 
-    def __init__(self, pink, orange, yellow, blue, parameters=None):
+    def __init__(self, pink, orange, yellow, blue, parameters: Dict[str, Any] = {}):
         """
         :param pink: GPIO pin the pink wire (A+)is connect to (Broadcom / pigpio numbering)
         :type pink: int
@@ -69,9 +69,7 @@ class Driver28BYJ48(UnipolarDriver):
         :type parameters: dict, optional
         """
 
-        if parameters is not None:
-            p: Dict[str, Any] = {**self.defaults, **parameters}
-        else:
-            p = self.defaults
+        p: Dict[str, Any] = self.defaults  # default values
+        p.update(parameters)  # replace defaults with custom values
 
         super().__init__(pink, orange, yellow, blue, parameters=p)

@@ -22,11 +22,9 @@ class DriverBase(object):
         MICROSTEP_DEFAULT: 1
     }
 
-    def __init__(self, parameters=None):
-        if parameters is not None:
-            self._parameters: Dict[str, Any] = {**self.defaults, **parameters}
-        else:
-            self._parameters = self.defaults
+    def __init__(self, parameters: Dict[str, Any] = {}):
+        self._parameters: Dict[str, Any] = self.defaults  # default values
+        self._parameters.update(parameters)  # replace defaults with custom values
 
         self._direction: int = CW
         """Direction of movement, either CW (1), CCW (-1)."""
@@ -184,7 +182,7 @@ class DriverBase(object):
                     negative if the requested microsteps can not be set at the moment.
         :rtype: int
         """
-        return 0    # should be overriden in the subclasses.
+        return 0  # should be overriden in the subclasses.
 
     def perform_step(self, delay: int) -> list:
         """Returns a list of pigpio pulse objects (a wave) for a single
