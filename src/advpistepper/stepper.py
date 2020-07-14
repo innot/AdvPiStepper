@@ -1,10 +1,11 @@
 """ Stepper Driver"""
 import multiprocessing
+import time
 from dataclasses import dataclass
 from enum import Enum, auto
 from math import sqrt
 from multiprocessing import Process, Pipe
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 import pigpio
 
@@ -105,6 +106,8 @@ class Verb(Enum):
     ZERO = auto()
     # emergency stop
     HARD_STOP = auto()
+    # end process
+    QUIT = auto()
 
     # get value. The Noun contains the ID of the value. The value is returned via the results Pipe.
     GET = auto()
@@ -127,9 +130,9 @@ class Noun(Enum):
 class Command(object):
     """Command object passed from the Frontend to the background Process."""
     verb: Verb = None
-    noun: Noun = None
+    noun: Union[Noun, int, float] = None
 
-    def __init__(self, verb: Verb, noun: Noun):
+    def __init__(self, verb: Verb, noun: Union[Noun, int, float]):
         self.verb = verb
         self.noun = noun
 
@@ -138,9 +141,9 @@ class Command(object):
 class Result(object):
     """Result object passed from the background Process to the frontend."""
     noun: Noun = None
-    value = None
+    value: Union[int, float, bool] = None
 
-    def __init__(self, noun: Noun, value):
+    def __init__(self, noun: Noun, value: Union[int, float, bool]):
         self.noun = noun
         self.value = value
 
@@ -151,33 +154,26 @@ class Statistics(object):
     runtime: int = 0
 
 
-class AdvPigpioStepper(object):
+class AdvPiStepper(object):
     """
     classdocs
     """
 
-    def __init__(self, pi=None, driver=None):
+    def __init__(self, driver=None, parameters: Dict[str, Any] = None):
         """
-        :param pi: 'obj':pigpio.pi
-            pigpio instance to use. If not given, the local pigpio
-            demon is used.
-
-        :param driver: 'obj':BaseDriver
+        :param driver:
             The GPIO driver used to translate steps to pigpio pulses
             and waves. The stepper may contain some optional info
             about the actual stepper motor (max. speed etc.)
             Defaults to a debug stepper (no actual gpio).
-
+        :type driver: DriverBase
+        :param parameters:
+            Optinal list of parameters to override default values.
+        :type parameters: Dict[str,Any]
         """
-
-        if pi is None:
-            pi = pigpio.pi()
 
         if driver is None:
             driver = DriverBase()
-
-        # initialize the driver
-        driver.init(pi)
 
         # Get the default speed/accel/decel parameters from the driver
         params = driver.parameters
@@ -185,7 +181,9 @@ class AdvPigpioStepper(object):
         c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
         self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
 
-        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver, pi, params)
+        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver, params)
+
+        self.process.start()
 
     @property
     def target_speed(self) -> float:
@@ -379,19 +377,18 @@ class AdvPigpioStepper(object):
 
 class StepperProcess(Process):
 
-    def __init__(self, command_pipe: Pipe, results_pipe: Pipe, driver: DriverBase, pi: pigpio.pi,
+    def __init__(self, command_pipe: Pipe, results_pipe: Pipe, driver: DriverBase = None,
                  parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
+
+        self.params: Dict[str, Any] = driver.parameters  # default values
+        if parameters is not None:
+            self.params.update(parameters)  # replace defaults with custom values
 
         # store the arguments
         self.c_pipe: Pipe = command_pipe
         self.r_pipe: Pipe = results_pipe
         self.driver = driver
-        self.pi = pi
-
-        self.params: Dict[str, Any] = driver.parameters  # default values
-        if parameters is not None:
-            self.params.update(parameters)  # replace defaults with custom values
 
         # set up the internal data
         self.cd = ControllerData()
@@ -416,24 +413,27 @@ class StepperProcess(Process):
         self.move_required = False
         """Flag to indicate that the Process has received a command to move the motor"""
 
+        self.quit_now = False
+        """Flag to indicate that the Process should terminate nicely."""
+
     def run(self):
+        # connect to pigpio once we have started as a process.
+        # pigpio.pi can not be pickled and can therefore not be passed
+        # to the stepper process.
+        self.connect_pigpio()
+
+        # Now we can initialize the driver
+        self.driver.init(self.pi)
 
         self.idle_loop()
 
-    def idle_loop(self):
-
-        while True:  # TODO implement some flag to quit this loop and the whole process
-            command = self.c_pipe.poll(None)  # Wait for command
-            self.command_handler(command)
-            if self.move_required:
-                self.busy_loop()
-                self.move_required = False  # Busy_loop only returns when the motor has stopped.
-
-    def busy_loop(self):
-        while True:
-            if self.c_pipe.poll():
-                command = self.c_pipe.recv()
-                self.command_handler(command)
+    def connect_pigpio(self):
+        p_addr = self.params.get(PIGPIO_ADDR)
+        p_port = self.params.get(PIGPIO_PORT, 8888)
+        if p_addr is not None:
+            self.pi = pigpio.pi(host=p_addr, port=p_port)
+        else:  # use localhost or as set by OS env variable PIGPIO_ADDR / _PORT
+            self.pi = pigpio.pi()
 
     def command_handler(self, command: Command):
         verb = command.verb
@@ -457,10 +457,12 @@ class StepperProcess(Process):
             self.continous(int(noun[1]))
         elif verb == Verb.STOP:
             self.stop()
-        elif verb == Verb.Zero:
+        elif verb == Verb.ZERO:
             self.zero()
         elif verb == Verb.HARD_STOP:
             self.hard_stop()
+        elif verb == Verb.QUIT:
+            self.quit()
         elif verb == Verb.GET:
             self.get_value(noun)
         else:
@@ -592,8 +594,20 @@ class StepperProcess(Process):
         self.target_position = delta
 
     def hard_stop(self):
-        # todo implement hard stop
+        # get the driver to stop immediately.
         self.driver.hard_stop()
+
+        # stop the engine
+        self.cd.state = STOP
+        self.cd.speed = 0.0
+        self.cd.step = 0
+
+        # tbd: maybe just invalidate both as the motor might have travelled some more
+        # steps before coming to a full stop
+        self.target_position = self.current_position
+
+    def quit(self):
+        self.quit_now = True
 
     def get_value(self, noun: Noun):
 
@@ -606,16 +620,45 @@ class StepperProcess(Process):
         elif noun == Noun.VAL_TARGET_POSITION:
             value = self.target_position
         elif noun == Noun.VAL_ACCELERATION:
-            value = self.params[ACCELERATION_RATE]
+            value = self.accel
         elif noun == Noun.VAL_DECELERATION:
-            value = self.params[DECELERATION_RATE]
+            value = self.decel
         else:
             value = None
 
         result = Result(noun, value)
         self.r_pipe.send(result)
 
-    def busy_loop_todo(self):
+    def idle_loop(self):
+
+        try:
+            while not self.quit_now:
+                self.c_pipe.poll(None)  # Wait for command
+                command = self.c_pipe.recv()
+                self.command_handler(command)
+                if self.move_required:
+                    self.busy_loop()
+                    self.move_required = False  # Busy_loop only returns when the motor has stopped.
+        except EOFError:
+            # the other end has closed the pipe.
+            # clean up and go home
+            return
+
+    def init_move(self):
+        self.driver.engage()
+
+        steps = self.target_position - self.current_position
+
+        if steps < 0:
+            direction = CCW
+        else:
+            direction = CW
+
+        self.cd.current_direction = direction
+        self.driver.set_direction = direction
+
+    def busy_loop(self):
+        self.init_move()
 
         self.pi.wave_clear()
         next_wave_id = -1
@@ -632,46 +675,56 @@ class StepperProcess(Process):
         # calculate the initial delay
         delay = self.calcuate_delay()
 
-        while True:
+        try:
+            while not self.quit_now:
 
-            wave = self.driver.perform_step(delay)
-            self.pi.wave_add_generic(wave)
-            next_wave_id = self.pi.wave_create_and_pad(10)
+                wave = self.driver.perform_step(delay)
+                self.pi.wave_add_generic(wave)
+                next_wave_id = self.pi.wave_create_and_pad(10)
 
-            #            print(f"id:{next_wave_id}, pulses: {self._pi.wave_get_pulses()}, \
-            #                           duration {self._pi.wave_get_micros()}")
+                #            print(f"id:{next_wave_id}, pulses: {self._pi.wave_get_pulses()}, \
+                #                           duration {self._pi.wave_get_micros()}")
 
-            self.pi.wave_send_using_mode(next_wave_id, pigpio.WAVE_MODE_ONE_SHOT_SYNC)
+                self.pi.wave_send_using_mode(next_wave_id, pigpio.WAVE_MODE_ONE_SHOT_SYNC)
 
-            # update the internal position as soon as the pulses are on
-            # their way.
-            if self.cd.current_direction == CW:
-                self.current_position += 1
-            else:
-                self.current_position -= 1
+                # update the internal position as soon as the pulses are on
+                # their way.
+                if self.cd.current_direction == CW:
+                    self.current_position += 1
+                else:
+                    self.current_position -= 1
 
-            # use the time while the current and next wave are being transmitted
-            # to calculate the delay of the next step
-            delay = self.calcuate_delay()
+                # use the time while the current and next wave are being transmitted
+                # to calculate the delay of the next step
+                delay = self.calcuate_delay()
 
-            while self.pi.wave_tx_at() == current_wave_id:
-                pass
-                # try to keep the timing as tight as practical
-                # even at the expense of a high cpu load
-                # Alternative: time.sleep(0.0001)
+                if delay == 0:
+                    # move finished, clean up all waves
+                    while self.pi.wave_tx_busy():  # wait for all pulses to transmit
+                        time.sleep(0.001)
+                    self.pi.wave_clear()
+                    return  # to the idle loop
 
-            if prev_wave_id != -1:
-                self.pi.wave_delete(prev_wave_id)
+                while self.pi.wave_tx_at() == current_wave_id:
+                    # to keep the timing as tight as practical
+                    # even at the expense of a high cpu load we just
+                    # poll the command pipe and the current wave id
+                    # at maximum speed and without yielding
+                    if self.c_pipe.poll():
+                        command = self.c_pipe.recv()
+                        self.command_handler(command)
 
-            if delay == 0:
-                # move finished
-                # TODO: clean up
-                return
+                if prev_wave_id != -1:
+                    self.pi.wave_delete(prev_wave_id)
 
-            prev_wave_id = current_wave_id
-            current_wave_id = next_wave_id
+                prev_wave_id = current_wave_id
+                current_wave_id = next_wave_id
 
-        # end of loop
+            # end of loop
+        except EOFError:
+            # Command pipe was closed - the other end has terminated
+            # close shop and go home
+            return
 
     def calcuate_delay(self) -> int:
 
@@ -701,7 +754,7 @@ class StepperProcess(Process):
             data.step = -int(decel_steps)
 
         if data.step == 0:
-            # first step or reversal infection point
+            # first step or reversal infliction point
             data.c_n = data.c_0
             data.step = 1
 
@@ -712,7 +765,7 @@ class StepperProcess(Process):
                     data.current_direction = CW
                 else:
                     data.current_direction = CCW
-                self.driver.set_direction(data.current_direction)
+                self.driver.direction = data.current_direction
 
             data.state = ACCEL
 

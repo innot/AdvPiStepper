@@ -6,7 +6,7 @@ Created on 11.06.2020
 
 import pigpio
 
-from advpistepper.stepper import AdvPigpioStepper
+from advpistepper.stepper import AdvPiStepper
 from advpistepper.driver_unipolar_28BYJ48 import Driver28BYJ48
 
 import sys;sys.path.append(r'C:\java\eclipse\eclipse-pde\plugins\org.python.pydev.core_7.6.0.202006041357\pysrc')
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     
     pi = pigpio.pi("raspberrypi")
     
-    stepper = AdvPigpioStepper(pi, drv_28byj48)
+    stepper = AdvPiStepper(pi, drv_28byj48)
     
     stepper.engage()
     

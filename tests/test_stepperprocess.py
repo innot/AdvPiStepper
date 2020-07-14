@@ -5,16 +5,20 @@ from advpistepper.stepper import *
 
 
 class TestStepperProcess(TestCase):
+    c_pipe = None
+    r_pipe = None
+
     def setUp(self) -> None:
+
         driver = DriverBase()
-        pi = pigpio.pi("raspberrypi")
 
         c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
         self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
 
-        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver, pi)
+        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver)
 
     def test_speed(self):
+        print("Test Command SPEED")
         for i in range(1, 1000, 100):
             self.process.speed(i)
             self.assertEqual(i, self.process.cd.target_speed)
@@ -36,6 +40,8 @@ class TestStepperProcess(TestCase):
         self.assertEqual(self.process.cd.step, -(1000 * 1000) / (2 * self.process.decel))
 
     def test_acceleration(self):
+        print("Test Command ACCELERATION")
+
         self.process.cd.step = 0  # should be 0, but just in case...
         rate = 1000
         self.process.acceleration(rate)
@@ -51,10 +57,12 @@ class TestStepperProcess(TestCase):
         self.assertEqual(self.process.accel, rate)
 
     def test_deceleration(self):
+        print("Test Command DECELERATION")
         self.process.deceleration(1234)
         self.assertEqual(self.process.decel, 1234)
 
     def test_move(self):
+        print("Test Command MOVE")
         self.process.move(0)
         self.assertEqual(self.process.target_position, 0)
         self.assertFalse(self.process.move_required)
@@ -74,6 +82,7 @@ class TestStepperProcess(TestCase):
         self.assertEqual(self.process.target_position, 999)
 
     def test_move_deg(self):
+        print("Test Command MOVE_DEG")
         self.process.full_steps_per_rev = 360  # just for convenience
 
         self.process.move_deg(0)
@@ -98,6 +107,7 @@ class TestStepperProcess(TestCase):
         self.assertEqual(self.process.target_position, -450)
 
     def test_moveto(self):
+        print("Test Command MOVETO")
         self.process.moveto(0)
         self.assertEqual(self.process.target_position, 0)
         self.assertFalse(self.process.move_required)
@@ -110,6 +120,7 @@ class TestStepperProcess(TestCase):
         self.assertTrue(self.process.move_required)
 
     def test_moveto_deg(self):
+        print("Test Command MOVETO_DEG")
         self.process.full_steps_per_rev = 360  # just for convenience
 
         self.process.moveto_deg(0)
@@ -178,6 +189,8 @@ class TestStepperProcess(TestCase):
         self.assertEqual(-1800, self.process.target_position)
 
     def test_continous(self):
+        print("Test Command CONTINUOUS")
+
         self.process.continous(CW)
         self.assertEqual(float('inf'), self.process.target_position)
         # check that the delay calculation works with infinity
@@ -194,7 +207,29 @@ class TestStepperProcess(TestCase):
         self.assertTrue(0 < delay < sys.maxsize)
         self.assertEqual(ACCEL, self.process.cd.state)
 
+    def test_init_move(self):
+        print("Test init_move()")
+
+        self.process.current_position = 1
+        self.process.target_position = 2
+        self.process.init_move()
+        self.assertEqual(CW, self.process.cd.current_direction)
+
+        self.process.target_position = 0
+        self.process.init_move()
+        self.assertEqual(CCW, self.process.cd.current_direction)
+
+        self.process.current_position = -1
+        self.process.target_position = -2
+        self.process.init_move()
+        self.assertEqual(CCW, self.process.cd.current_direction)
+
+        self.process.target_position = 0
+        self.process.init_move()
+        self.assertEqual(CW, self.process.cd.current_direction)
+
     def test_stop(self):
+        print("Test Command STOP")
         # fake a move
         self.process.cd.current_direction = CW
         self.process.cd.state = ACCEL
@@ -218,5 +253,115 @@ class TestStepperProcess(TestCase):
         self.process.stop()
         self.assertEqual(-self.process.cd.decel_steps, self.process.target_position)
 
+    def test_zero(self):
+        print("Test Command ZERO")
+        self.process.current_position = -1000
+        self.process.target_position = 1000
+        self.process.zero()
+        self.assertEqual(0, self.process.current_position)
+        self.assertEqual(2000, self.process.target_position)
+
+        self.process.current_position = 1000
+        self.process.target_position = -1000
+        self.process.zero()
+        self.assertEqual(0, self.process.current_position)
+        self.assertEqual(-2000, self.process.target_position)
+
     def test_hardstop(self):
-        pass
+        print("Test Command HARDSTOP")
+        # fake a running stepper at 1000 hz
+        self.process.cd.c_n = 1000
+        self.process.cd.state = RUN
+        self.process.cd.step = 100
+
+        self.process.hard_stop()
+
+        self.assertEqual(STOP, self.process.cd.state)
+        self.assertEqual(0.0, self.process.cd.speed)
+        self.assertEqual(0, self.process.cd.step)
+        self.assertEqual(self.process.target_position, self.process.current_position)
+
+    def test_get_value_target_speed(self):
+        print("Test get_value() TARGET_SPEED")
+        self.process.start()
+        self.c_pipe.send(Command(Verb.SPEED, 123.0))
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_TARGET_SPEED))
+        if not self.r_pipe.poll(10):    # the first command to result round trip is somehow sometimes very slow
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_TARGET_SPEED, result.noun)
+        self.assertEqual(123.0, result.value)
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+
+    def test_get_value_current_speed(self):
+        print("Test get_value() CURRENT_SPEED")
+        self.process.start()
+        self.c_pipe.send(Command(Verb.SPEED, 20.0))
+        self.c_pipe.send(Command(Verb.MOVETO, 100))
+        time.sleep(0.1)
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_CURRENT_SPEED))
+        if not self.r_pipe.poll(2):
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_CURRENT_SPEED, result.noun)
+        self.assertTrue(result.value == 20)
+        self.c_pipe.send(Command(Verb.STOP, 0))
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+
+    def test_get_value_acceleration(self):
+        print("Test get_value() ACCELERATION")
+        self.process.start()
+        self.c_pipe.send(Command(Verb.ACCELARATION, 1234))
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_ACCELERATION))
+        if not self.r_pipe.poll(1):
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_ACCELERATION, result.noun)
+        self.assertEqual(1234, result.value)
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+
+    def test_get_value_deceleration(self):
+        print("Test get_value() DECELERATION")
+        self.process.start()
+        self.c_pipe.send(Command(Verb.DECELERATION, 2345))
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_DECELERATION))
+        if not self.r_pipe.poll(1):
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_DECELERATION, result.noun)
+        self.assertEqual(2345, result.value)
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+
+    def test_get_value_target_position(self):
+        print("Test get_value() TARGET_POSITION")
+        self.process.start()
+        self.c_pipe.send(Command(Verb.MOVETO, 10))
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_TARGET_POSITION))
+        if not self.r_pipe.poll(2):
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_TARGET_POSITION, result.noun)
+        self.assertEqual(10, result.value)
+        self.c_pipe.send(Command(Verb.STOP, 0))
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+
+    def test_get_value_current_position(self):
+        print("Test get_value() CURRENT_POSITION")
+        self.process.start()
+        self.c_pipe.send(Command(Verb.MOVETO, 100))
+        time.sleep(0.1)
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_CURRENT_POSITION))
+        if not self.r_pipe.poll(2):
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_CURRENT_POSITION, result.noun)
+        self.assertTrue(0 < result.value < 100)
+        self.c_pipe.send(Command(Verb.STOP, 0))
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+

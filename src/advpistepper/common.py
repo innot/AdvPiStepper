@@ -34,3 +34,9 @@ MICROSTEP_OPTIONS: str = "microstep_options"
 
 MICROSTEP_DEFAULT = "microstep_default"
 """The prefered microstep rate of the driver."""
+
+PIGPIO_ADDR = "pigpio_addr"
+"""The hostname of the system where the pigpio daemon is running on. Default is empty for the localhost."""
+
+PIGPIO_PORT = "pigpio_port"
+"""The port on which the pigpio daemon is listening on. Default is empty to use the default pigpio port (8888)."""

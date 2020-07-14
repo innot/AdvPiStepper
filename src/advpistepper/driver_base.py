@@ -58,8 +58,7 @@ class DriverBase(object):
                         Parameters with invalid names will be ignored.#
         :type values: Dict[str, Any]
         """
-        p: Dict[str, Any] = self._parameters
-        self._parameters = {**p, **values}
+        self._parameters.update(values)
 
     @property
     def max_speed(self) -> float:
@@ -201,5 +200,10 @@ class DriverBase(object):
         The default is just to de-energize the coils, but some more
         advanced stepper drivers may have braking or other means to come
         to a quick stop.
+        Due to the asynchronous nature of the engine there might be
+        multiple stepper motor pulses already in the pipeline that will
+        be transmitted even after a call to hard_stop().
+        Subclasses should take care that these pulses do not cause any
+        further motor movement, e.g. by setting the GPIO pins to input.
         """
         self.release()

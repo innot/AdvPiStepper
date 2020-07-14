@@ -7,7 +7,7 @@ Created on 11.06.2020
 import sys
 import pigpio
 
-from advpistepper.stepper import AdvPigpioStepper
+from advpistepper.stepper import AdvPiStepper
 from advpistepper.driver_unipolar_28byj48 import Driver28BYJ48
 
 
@@ -22,7 +22,7 @@ def main(argv):
 
     pi_drv = pigpio.pi()
 
-    stepper = AdvPigpioStepper(pi_drv, drv_28byj48)
+    stepper = AdvPiStepper(pi_drv, drv_28byj48)
 
     stepper.engage()
 
