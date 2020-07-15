@@ -1,3 +1,12 @@
+#  Copyright (c) 2020 Thomas Holland (thomas@innot.de)
+#  All rights reserved.
+#
+#  This code is licensed under the MIT License.
+#
+#  Refer to the LICENSE file which is part of the AdvPiStepper distribution or
+#  to https://opensource.org/licenses/MIT for a text of the license.
+#
+
 import sys
 from unittest import TestCase
 
@@ -313,7 +322,7 @@ class TestStepperProcess(TestCase):
     def test_get_value_acceleration(self):
         print("Test get_value() ACCELERATION")
         self.process.start()
-        self.c_pipe.send(Command(Verb.ACCELARATION, 1234))
+        self.c_pipe.send(Command(Verb.ACCELERATION, 1234))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_ACCELERATION))
         if not self.r_pipe.poll(1):
             self.fail()
@@ -365,3 +374,7 @@ class TestStepperProcess(TestCase):
         self.c_pipe.send(Command(Verb.QUIT, 0))
         self.process.join()
 
+    def test_get_value_full_steps_per_rev(self):
+        print("Test get_value() FULL_STEPS_PER_REV")
+        self.process.start()
+        self.c_pipe.send(Command())

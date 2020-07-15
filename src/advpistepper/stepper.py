@@ -1,4 +1,15 @@
+#  Copyright (c) 2020 Thomas Holland (thomas@innot.de)
+#  All rights reserved.
+#
+#  This code is licensed under the MIT License.
+#
+#  Refer to the LICENSE file which is part of the AdvPiStepper distribution or
+#  to https://opensource.org/licenses/MIT for a text of the license.
+#
+#
+
 """ Stepper Driver"""
+
 import multiprocessing
 import time
 from dataclasses import dataclass
@@ -89,35 +100,45 @@ class ControllerData:
 
 
 class Verb(Enum):
-    # target speed
+    """List of Commands that can be send to the stepper background process."""
+    # set target values
     SPEED = auto()
+    ACCELERATION = auto()
+    DECELERATION = auto()
+    FULL_STEPS_PER_REV = auto()
+
     # Relative Moves
     MOVE = auto()
     MOVE_DEG = auto()
     MOVE_RAD = auto()
+
     # Absolute Moves
     MOVETO = auto()
     MOVETO_DEG = auto()
     MOVETO_RAD = auto()
+
     # Constant speed mode
     RUN = auto()
     STOP = auto()
+
     # reset absolut position
     ZERO = auto()
+
     # emergency stop
     HARD_STOP = auto()
+
     # end process
     QUIT = auto()
 
     # get value. The Noun contains the ID of the value. The value is returned via the results Pipe.
     GET = auto()
 
-    # set value
-    ACCELARATION = auto()
-    DECELERATION = auto()
+    # Do nothing operator. Used for setting up the Pipe
+    NOP = auto()
 
 
 class Noun(Enum):
+    """List of values that can be queried with the GET Verb."""
     VAL_CURRENT_SPEED = auto()
     VAL_TARGET_SPEED = auto()
     VAL_CURRENT_POSITION = auto()
@@ -128,7 +149,7 @@ class Noun(Enum):
 
 @dataclass
 class Command(object):
-    """Command object passed from the Frontend to the background Process."""
+    """Command object passed from the frontend to the background Process."""
     verb: Verb = None
     noun: Union[Noun, int, float] = None
 
@@ -177,19 +198,27 @@ class AdvPiStepper(object):
 
         # Get the default speed/accel/decel parameters from the driver
         params = driver.parameters
+        if parameters is not None:
+            # User passed some parameters to extend or override the defaults.
+            params.update(parameters)
 
+        # setup and start the background process.
         c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
         self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
 
         self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver, params)
 
         self.process.start()
+        self.c_pipe.send(Command(Verb.NOP, 0))  # Just to get the pipe opened and ready for action
 
     @property
     def target_speed(self) -> float:
         """
-        Get the selected target speed. During acceleration / deceleration
+        Get the selected target speed.
+
+        During acceleration / deceleration
         the actual speed may be less than the target speed.
+
         :return: The speed in steps or microsteps per second
         :rtype: float
         """
@@ -198,7 +227,10 @@ class AdvPiStepper(object):
 
     @target_speed.setter
     def target_speed(self, speed: float):
-        """ Set the target speed. This is the speed the controller will
+        """
+        Set the target speed.
+
+        This is the speed the controller will
         accelerate to and maintain once reached. The speed is 
         independent from the direction, therefore the speed must be
         greater than 0.
@@ -216,8 +248,12 @@ class AdvPiStepper(object):
     @property
     def current_speed(self) -> float:
         """
-        Get the current speed. During acceleration / deceleration
-        the current speed may be less than the target speed.
+        Get the current speed.
+        During acceleration / deceleration the current speed will be
+        less than the target speed. Also during accel/decels and due
+        to the asynchronous nature of AdvPiStepper the returned value
+        might be a microseconds old and therefore outdated.
+
         :return: The speed in steps or microsteps per second
         :rtype: float
         """
@@ -226,42 +262,56 @@ class AdvPiStepper(object):
 
     @property
     def acceleration(self) -> float:
-        """Get the current acceleration.
+        """
+        Get the current acceleration rate.
+
         :return: The set acceleration in steps per second squared.
-        :rtype: float"""
+        :rtype: float
+        """
         result = self._get_value(Noun.VAL_ACCELERATION)
         return float(result)
 
     @acceleration.setter
-    def acceleration(self, rate):
-        """Sets the desired acceleration in steps per second squared.
+    def acceleration(self, rate: float):
+        """
+        Sets the desired acceleration in steps per second squared.
 
         High values may cause lost steps and stalled motors
+
+        This property will override any default acceleration rate
+        set by the driver. Any changes to this rate will be applied
+        immediately and will affect any ongoing acceleration.
 
         :param rate: Must be greater than 0.
         :type rate: float
         :raises ValueError: if the rate is not valid.
         """
-
         if rate <= 0.0:
             raise ValueError(f"Acceleration must be greater than 0.0, was {rate}")
 
-        cmd = Command(Verb.ACCELARATION, rate)
+        cmd = Command(Verb.ACCELERATION, rate)
         self.c_pipe.send(cmd)
 
     @property
     def deceleration(self):
-        """Get the current deceleration.
+        """
+        Get the current deceleration rate.
+
         :return: The set deceleration in steps per second squared.
-        :rtype: float"""
+        :rtype: float
+        """
         result = self._get_value(Noun.VAL_DECELERATION)
         return float(result)
 
     @deceleration.setter
-    def deceleration(self, rate):
+    def deceleration(self, rate: float):
         """Sets the desired deceleration in steps per second squared.
 
         High values may cause lost steps due to motor inertia.
+
+        This property will override any default deceleration rate
+        set by the driver. Any changes to this rate will be applied
+        immediately and will affect any ongoing deceleration.
 
         :param rate: Must be greater than 0.
         :type rate: float
@@ -275,27 +325,35 @@ class AdvPiStepper(object):
         self.c_pipe.send(cmd)
 
     @property
-    def full_steps_per_rev(self):
+    def full_steps_per_rev(self) -> int:
         """
-        Returns
-        -------
-             the number of full steps per full revolution.
+        Get the number of full steps for a single revolution of the stepper motor.
+
+        :returns: number of steps. 0 if not defined.
+        :rtype: int
         """
-        return self._full_steps_per_rev
+        result = self._get_value(Noun.VAL_FULL_STEPS_PER_REV)
+        return result
 
     @full_steps_per_rev.setter
-    def full_steps_per_rev(self, steps):
-        """Set the number of full steps for one complete revolution.
-
-        Parameters
-        ----------
-        steps : int
-            must be equal or greater than 2.
+    def full_steps_per_rev(self, steps: int):
         """
-        if steps < 2:
+        Set the number of full steps for one complete revolution.
+
+        Overrides any default value that may have been set by the driver.
+
+        Is applied immediately and will effect any succeding
+        move_deg() or moveto_deg() calls.
+
+        :param steps: number of steps. May be 0 to indicate an undefined value.
+        :type steps: int
+        :raises ValueError: If the argument is not an integer 0 or greater.
+        """
+        if steps < 0:
             raise ValueError("steps must be 2 or greater")
 
-        self._full_steps_per_rev = steps
+        cmd = Command(Verb.FULL_STEPS_PER_REV, steps)
+        self.c_pipe.send(cmd)
 
     @property
     def microsteps(self):
@@ -341,7 +399,7 @@ class AdvPiStepper(object):
     def disengage(self):
         self._driver.release()
 
-    def _get_value(self, noun: Noun):
+    def _get_value(self, noun: Noun) -> Union[int, float, bool]:
         """Retrieve the given parameter from the stepper process.
         This method blocks until the value is returned by the process, but
         not longer than 1 second (responses time should be in the
@@ -361,18 +419,6 @@ class AdvPiStepper(object):
             print(f"received unexpected result {result}")
         else:
             return result.value
-
-    def _init_move(self, steps, speed):
-
-        self._driver.engage()
-
-        if steps < 0:
-            self._cd.current_direction = CCW
-            steps = -steps
-        else:
-            self._cd.current_direction = CW
-
-        self._driver.set_direction(self._cd.current_direction)
 
 
 class StepperProcess(Process):
@@ -441,10 +487,12 @@ class StepperProcess(Process):
 
         if verb == Verb.SPEED:
             self.speed(float(noun))
-        elif verb == Verb.ACCELARATION:
+        elif verb == Verb.ACCELERATION:
             self.acceleration(float(noun))
         elif verb == Verb.DECELERATION:
             self.deceleration(float(noun))
+        elif verb == Verb.FULL_STEPS_PER_REV:
+            self.steps_per_rev(int(noun))
         elif verb == Verb.MOVE:
             self.move(int(noun))
         elif verb == Verb.MOVE_DEG:
@@ -465,6 +513,9 @@ class StepperProcess(Process):
             self.quit()
         elif verb == Verb.GET:
             self.get_value(noun)
+        elif verb == Verb.NOP:
+            # do nothing
+            pass
         else:
             raise RuntimeError(f"Received unknown command {command}")
 
@@ -499,6 +550,9 @@ class StepperProcess(Process):
 
     def deceleration(self, rate: float):
         self.decel = rate
+
+    def steps_per_rev(self, steps: int):
+        self.full_steps_per_rev = steps
 
     def move(self, relative):
         self.target_position = self.current_position + relative
@@ -623,6 +677,8 @@ class StepperProcess(Process):
             value = self.accel
         elif noun == Noun.VAL_DECELERATION:
             value = self.decel
+        elif noun == Noun.VAL_FULL_STEPS_PER_REV:
+            value = self.full_steps_per_rev
         else:
             value = None
 
