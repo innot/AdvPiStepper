@@ -21,15 +21,16 @@ class TestStepperProcess(TestCase):
 
         driver = DriverBase()
 
-        c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
-        self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
+        c_pipe_remote, self.c_pipe = Pipe()
+        self.r_pipe, r_pipe_remote = Pipe()
+        self.idle_event = Event()
 
-        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver)
+        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.idle_event, driver)
 
     def test_speed(self):
         print("Test Command SPEED")
         for i in range(1, 1000, 100):
-            self.process.speed(i)
+            self.process.set_speed(i)
             self.assertEqual(i, self.process.cd.target_speed)
             self.assertEqual(1000000 / i, self.process.cd.c_target)
 
@@ -39,36 +40,36 @@ class TestStepperProcess(TestCase):
         self.process.cd.step = 100
 
         # test acceleration
-        self.process.speed(2000)
+        self.process.set_speed(2000)
         self.assertEqual(INC, self.process.cd.state)
-        self.assertEqual((2000 * 2000) / (2 * self.process.accel), self.process.cd.step)
+        self.assertEqual((2000 * 2000) / (2 * self.process.acceleration), self.process.cd.step)
 
         # ... and deceleration
-        self.process.speed(1000)
+        self.process.set_speed(1000)
         self.assertEqual(self.process.cd.state, DEC)
-        self.assertEqual(self.process.cd.step, -(1000 * 1000) / (2 * self.process.decel))
+        self.assertEqual(self.process.cd.step, -(1000 * 1000) / (2 * self.process.deceleration))
 
     def test_acceleration(self):
         print("Test Command ACCELERATION")
 
         self.process.cd.step = 0  # should be 0, but just in case...
         rate = 1000
-        self.process.acceleration(rate)
+        self.process.set_acceleration(rate)
         self.assertEqual(self.process.cd.step, 0)
         self.assertEqual(self.process.cd.c_0, 0.676 * sqrt(2.0 / rate) * 1000000)
-        self.assertEqual(self.process.accel, rate)
+        self.assertEqual(self.process.acceleration, rate)
 
         self.process.cd.step = 10
         rate = 2000
-        self.process.acceleration(rate)
+        self.process.set_acceleration(rate)
         self.assertEqual(self.process.cd.step, 10 * (1000 / rate))
         self.assertEqual(self.process.cd.c_0, 0.676 * sqrt(2.0 / rate) * 1000000)
-        self.assertEqual(self.process.accel, rate)
+        self.assertEqual(self.process.acceleration, rate)
 
     def test_deceleration(self):
         print("Test Command DECELERATION")
-        self.process.deceleration(1234)
-        self.assertEqual(self.process.decel, 1234)
+        self.process.set_deceleration(1234)
+        self.assertEqual(self.process.deceleration, 1234)
 
     def test_move(self):
         print("Test Command MOVE")
@@ -200,19 +201,19 @@ class TestStepperProcess(TestCase):
     def test_continous(self):
         print("Test Command CONTINUOUS")
 
-        self.process.continous(CW)
+        self.process.continuous(CW)
         self.assertEqual(float('inf'), self.process.target_position)
         # check that the delay calculation works with infinity
-        delay = self.process.calcuate_delay()
+        delay = self.process.calculate_delay()
         self.assertTrue(0 < delay < sys.maxsize)
         self.assertEqual(ACCEL, self.process.cd.state)
 
         # reset state
         self.process.cd = ControllerData()
 
-        self.process.continous(CCW)
+        self.process.continuous(CCW)
         self.assertEqual(float('-inf'), self.process.target_position)
-        delay = self.process.calcuate_delay()
+        delay = self.process.calculate_delay()
         self.assertTrue(0 < delay < sys.maxsize)
         self.assertEqual(ACCEL, self.process.cd.state)
 
@@ -244,11 +245,11 @@ class TestStepperProcess(TestCase):
         self.process.cd.state = ACCEL
         self.process.cd.c_n = 1000
         self.process.cd.step = 1000
-        self.process.cd.speed = 1000
+        self.process.cd.set_speed = 1000
 
         self.process.target_position = 123456
         self.process.current_position = 0
-        self.process.calcuate_delay()
+        self.process.calculate_delay()
 
         self.process.stop()
         self.assertEqual(self.process.cd.decel_steps, self.process.target_position)
@@ -257,7 +258,7 @@ class TestStepperProcess(TestCase):
         self.process.cd.current_direction = CCW
         self.process.target_position = -123456
         self.process.current_position = 0
-        self.process.calcuate_delay()
+        self.process.calculate_delay()
 
         self.process.stop()
         self.assertEqual(-self.process.cd.decel_steps, self.process.target_position)
@@ -391,12 +392,30 @@ class TestStepperProcess(TestCase):
         self.process.join()
 
         # Check that rotational moves pick up the new value
-        self.process.steps_per_rev(1000)
+        self.process.set_full_steps_per_rev(1000)
         self.process.moveto_deg(360)  # one rotation CW
         self.assertEqual(1000, self.process.target_position)
 
         self.process.zero()
-        self.process.steps_per_rev(2048)
+        self.process.set_full_steps_per_rev(2048)
         self.process.microsteps = 2
         self.process.move_deg(-360)
         self.assertEqual(-4096, self.process.target_position)
+
+    def test_idle_event(self):
+        print("Test idle_event")
+        self.idle_event.clear()  # Ensure default behaviour
+        self.process.start()
+        self.idle_event.wait(2)  # two seconds should suffice for the backend to enter the idle loop
+
+        self.c_pipe.send(Command(Verb.MOVETO, 10))
+        t0 = time.time()
+        while self.idle_event.is_set():  # wait for the move to start
+            if (time.time() - t0) > 1:  # fail if the move does not start within one second
+                self.fail("Move did not cause idle event to be cleared")
+
+        self.idle_event.wait(2)  # wait not more than two seconds for the move to finish
+        self.assertTrue(self.idle_event.is_set())  # OK only if not timed out
+
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()

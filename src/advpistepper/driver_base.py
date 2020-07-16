@@ -160,9 +160,9 @@ class DriverBase(object):
 
     def set_microsteps(self, steps: int) -> bool:
         """Set the number of microsteps to use.
-        This method will only be successfull if the driver is ready for a change in
+        This method will only be successful if the driver is ready for a change in
         microsteps, which can be checked with the steps_until_change_microsteps() method.
-        :returns: True if the change was successfull, False if not.
+        :returns: True if the change was successful, False if not.
         :rtype: bool
         """
         self._microsteps = steps  # should be overridden by subclasses

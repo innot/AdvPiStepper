@@ -10,12 +10,11 @@
 
 """ Stepper Driver"""
 
-import multiprocessing
 import time
 from dataclasses import dataclass
 from enum import Enum, auto
 from math import sqrt
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Event
 from typing import Dict, Any, Union
 
 import pigpio
@@ -106,6 +105,7 @@ class Verb(Enum):
     ACCELERATION = auto()
     DECELERATION = auto()
     FULL_STEPS_PER_REV = auto()
+    MICROSTEPS = auto()
 
     # Relative Moves
     MOVE = auto()
@@ -146,6 +146,11 @@ class Noun(Enum):
     VAL_ACCELERATION = auto()
     VAL_DECELERATION = auto()
     VAL_FULL_STEPS_PER_REV = auto()
+    VAL_MICROSTEPS = auto()
+
+    # Microstep return values
+    MICROSTEP_NOT_POSSIBLE = auto()
+    MICROSTEP_CHANGE_AT = auto()
 
 
 @dataclass
@@ -204,13 +209,16 @@ class AdvPiStepper(object):
             params.update(parameters)
 
         # setup and start the background process.
-        c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
-        self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
+        c_pipe_remote, self.c_pipe = Pipe()
+        self.r_pipe, r_pipe_remote = Pipe()
+        self.idle_event = Event()
 
-        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, driver, params)
+        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.idle_event, driver, params)
 
         self.process.start()
         self.c_pipe.send(Command(Verb.NOP, 0))  # Just to get the pipe opened and ready for action
+
+        self.parameters = params  # keep the current parameters for reference
 
     @property
     def target_speed(self) -> float:
@@ -357,21 +365,37 @@ class AdvPiStepper(object):
         self.c_pipe.send(cmd)
 
     @property
-    def microsteps(self):
+    def microsteps(self) -> int:
         """
-        :returns: currently set number of microsteps.
+        Get the currently set number of microsteps per full step.
+
+        :returns: number betwenn 1 and the max supported number of microsteps.
         :rtype: int"""
 
-        return self._microsteps
+        result = self._get_value(Noun.VAL_MICROSTEPS)
+        return result
 
     @microsteps.setter
-    def microsteps(self, steps):
+    def microsteps(self, steps: int):
         """
-        Set number of microsteps per full step.
+        Set the number of microsteps per full step.
+        The number must be from the list of supported MICROSTEP_OPTIONS.
+        Changing microsteps while the stepper motor is running may or may
+        not work - depending on the driver. Refer to the driver documentation
+        for changing microsteps while running.
+        Some drivers need to sync their internal step sequencer before changing
+        the microstep setting. Therefore the change may happen at some
+        point in the future without any guarantee about the exact step.
+
+        If the microstep setting is changed while the motor is running the
+        absolute speed will be unchanged, i.e. the target speed (in steps per
+        second) will be scaled by new_microsteps / old_microsteps.
+
         :param steps: 
         """
-        if steps not in self._microstep_options:
-            raise ValueError("Given microstep setting is not valid")
+        if steps not in self.parameters[MICROSTEP_OPTIONS]:
+            raise ValueError(
+                f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
         self._driver.microsteps = steps
 
@@ -421,10 +445,14 @@ class AdvPiStepper(object):
         else:
             return result.value
 
+    def _wait_for_move(self):
+        self.idle_event.wait()
+        self.idle_event.clear()  # rearm the flag for the next move
+
 
 class StepperProcess(Process):
 
-    def __init__(self, command_pipe: Pipe, results_pipe: Pipe, driver: DriverBase = None,
+    def __init__(self, command_pipe: Pipe, results_pipe: Pipe, idle_event: Event, driver: DriverBase = None,
                  parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
@@ -435,6 +463,7 @@ class StepperProcess(Process):
         # store the arguments
         self.c_pipe: Pipe = command_pipe
         self.r_pipe: Pipe = results_pipe
+        self.idle_event = idle_event
         self.driver = driver
 
         # set up the internal data
@@ -446,22 +475,23 @@ class StepperProcess(Process):
         self.target_position: int = 0
         """Where the motor should drive to (in steps/microsteps)."""
 
-        self.microsteps: int = 1
-        """Number of microsteps per full step currently set.
-        1 means no microstepping (default).
-        """
+        self.microsteps: int = self.params[MICROSTEP_DEFAULT]
+        """Number of microsteps per full step currently set.Default supplied by driver."""
 
-        self.accel: float = self.params[ACCELERATION_RATE]
-        self.decel: float = self.params[DECELERATION_RATE]
+        self.acceleration: float = self.params[ACCELERATION_RATE]
+        self.deceleration: float = self.params[DECELERATION_RATE]
         self.full_steps_per_rev: int = self.params[FULL_STEPS_PER_REV]
 
-        self.acceleration(self.accel)  # calculate c_0 from the passed acceleration
+        self.set_acceleration(self.acceleration)  # calculate c_0 from the passed acceleration
 
         self.move_required = False
         """Flag to indicate that the Process has received a command to move the motor"""
 
         self.quit_now = False
         """Flag to indicate that the Process should terminate nicely."""
+
+        self.microstep_change_at = None
+        self.microstep_new_value = None
 
     def run(self):
         # connect to pigpio once we have started as a process.
@@ -487,13 +517,15 @@ class StepperProcess(Process):
         noun = command.noun
 
         if verb == Verb.SPEED:
-            self.speed(float(noun))
+            self.set_speed(float(noun))
         elif verb == Verb.ACCELERATION:
-            self.acceleration(float(noun))
+            self.set_acceleration(float(noun))
         elif verb == Verb.DECELERATION:
-            self.deceleration(float(noun))
+            self.set_deceleration(float(noun))
         elif verb == Verb.FULL_STEPS_PER_REV:
-            self.steps_per_rev(int(noun))
+            self.set_full_steps_per_rev(int(noun))
+        elif verb == Verb.MICROSTEPS:
+            self.set_microsteps(int(noun))
         elif verb == Verb.MOVE:
             self.move(int(noun))
         elif verb == Verb.MOVE_DEG:
@@ -503,7 +535,7 @@ class StepperProcess(Process):
         elif verb == Verb.MOVETO_DEG:
             self.moveto_deg(float(noun[0]))
         elif verb == Verb.RUN:
-            self.continous(int(noun[1]))
+            self.continuous(int(noun[1]))
         elif verb == Verb.STOP:
             self.stop()
         elif verb == Verb.ZERO:
@@ -520,7 +552,7 @@ class StepperProcess(Process):
         else:
             raise RuntimeError(f"Received unknown command {command}")
 
-    def speed(self, speed):
+    def set_speed(self, speed):
         old_speed = self.cd.target_speed
         if speed == old_speed:
             # nothing to do here
@@ -531,29 +563,62 @@ class StepperProcess(Process):
         # accelerating or decelarating to a step
         if speed > old_speed and (self.cd.state == RUN or self.cd.state == DEC):
             # Austin Eq.16, Changes of accelaration
-            self.cd.step = (speed * speed) / (2.0 * self.accel)
+            self.cd.step = (speed * speed) / (2.0 * self.acceleration)
             self.cd.state = INC
         elif speed < old_speed and self.cd.state != DECEL:
             # see above, with negativ sign to cause a deceleration
-            self.cd.step = -(speed * speed) / (2.0 * self.decel)
+            self.cd.step = -(speed * speed) / (2.0 * self.deceleration)
             self.cd.state = DEC
 
         # Set the actual target parameter
         self.cd.c_target = 1000000 / speed
         self.cd.target_speed = speed
 
-    def acceleration(self, rate: float):
+    def set_acceleration(self, rate: float):
         # recalculate n (step) and c_0
         # See Austin Eq.15
-        self.cd.step = self.cd.step * (self.accel / rate)
+        self.cd.step = self.cd.step * (self.acceleration / rate)
         self.cd.c_0 = 0.676 * sqrt(2.0 / rate) * 1000000
-        self.accel = rate
+        self.acceleration = rate
 
-    def deceleration(self, rate: float):
-        self.decel = rate
+    def set_deceleration(self, rate: float):
+        self.deceleration = rate
 
-    def steps_per_rev(self, steps: int):
+    def set_full_steps_per_rev(self, steps: int):
         self.full_steps_per_rev = steps
+
+    def set_microsteps(self, steps: int):
+        c_steps = self.driver.steps_until_change_microsteps(steps)
+        if c_steps < 0:
+            # microstep setting not possible
+            self.c_pipe.send(Result(Noun.MICROSTEP_NOT_POSSIBLE, 0))
+            return
+
+        self.microstep_new_value = steps
+
+        if c == 0:
+            self._perform_microstep_change()
+            change_pos = self.current_position
+        else:
+            change_pos = self.current_position + (c_steps * self.cd.current_direction)
+            self.microstep_change_at = change_pos
+            self.microstep_new_value = steps
+
+        self.c_pipe.send(Result(Noun.MICROSTEP_CHANGE_AT, change_pos))
+
+    def _perform_microstep_change(self):
+        previous = self.microsteps
+        self.microsteps = self.microstep_new_value
+        factor = self.microstep_new_value / previous
+        self.current_position *= factor
+        self.target_position *= factor
+        self.set_acceleration(self.acceleration * factor)
+        self.set_deceleration(self.deceleration * factor)
+        self.set_speed(self.cd.target_speed * factor)
+        self.cd.step *= factor
+        self.cd.c_target *= factor
+
+        self.microstep_change_at = None
 
     def move(self, relative):
         self.target_position = self.current_position + relative
@@ -627,7 +692,7 @@ class StepperProcess(Process):
 
         self.moveto(target_position)
 
-    def continous(self, direction: int):
+    def continuous(self, direction: int):
         if direction == CW:
             self.target_position = float('inf')
         else:
@@ -675,9 +740,9 @@ class StepperProcess(Process):
         elif noun == Noun.VAL_TARGET_POSITION:
             value = self.target_position
         elif noun == Noun.VAL_ACCELERATION:
-            value = self.accel
+            value = self.acceleration
         elif noun == Noun.VAL_DECELERATION:
-            value = self.decel
+            value = self.deceleration
         elif noun == Noun.VAL_FULL_STEPS_PER_REV:
             value = self.full_steps_per_rev
         else:
@@ -690,12 +755,14 @@ class StepperProcess(Process):
 
         try:
             while not self.quit_now:
+                self.idle_event.set()  # Tell the world that we are twiddeling our thumbs
                 self.c_pipe.poll(None)  # Wait for command
                 command = self.c_pipe.recv()
                 self.command_handler(command)
                 if self.move_required:
+                    self.idle_event.clear()  # ... but not anymore
                     self.busy_loop()
-                    self.move_required = False  # Busy_loop only returns when the motor has stopped.
+                    self.move_required = False
         except EOFError:
             # the other end has closed the pipe.
             # clean up and go home
@@ -730,7 +797,7 @@ class StepperProcess(Process):
         self.pi.wave_send_once(current_wave_id)
 
         # calculate the initial delay
-        delay = self.calcuate_delay()
+        delay = self.calculate_delay()
 
         try:
             while not self.quit_now:
@@ -751,9 +818,13 @@ class StepperProcess(Process):
                 else:
                     self.current_position -= 1
 
+                # check if a change in microsteps is scheduled
+                if self.microstep_change_at == self.current_position:
+                    self._perform_microstep_change()
+
                 # use the time while the current and next wave are being transmitted
                 # to calculate the delay of the next step
-                delay = self.calcuate_delay()
+                delay = self.calculate_delay()
 
                 if delay == 0:
                     # move finished, clean up all waves
@@ -783,7 +854,7 @@ class StepperProcess(Process):
             # close shop and go home
             return
 
-    def calcuate_delay(self) -> int:
+    def calculate_delay(self) -> int:
 
         data = self.cd
 
@@ -791,7 +862,7 @@ class StepperProcess(Process):
 
         # determine the number of steps to come to a full stop from
         # the current speed. [1] Equation 16
-        decel_steps = int(((data.speed * data.speed) / (2 * self.decel)) + 0.5)
+        decel_steps = int(((data.speed * data.speed) / (2 * self.deceleration)) + 0.5)
         data.decel_steps = decel_steps
 
         if delta_position == 0 and decel_steps <= 1:
