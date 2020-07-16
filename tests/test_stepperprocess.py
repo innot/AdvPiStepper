@@ -295,7 +295,7 @@ class TestStepperProcess(TestCase):
         self.process.start()
         self.c_pipe.send(Command(Verb.SPEED, 123.0))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_TARGET_SPEED))
-        if not self.r_pipe.poll(10):    # the first command to result round trip is somehow sometimes very slow
+        if not self.r_pipe.poll(10):  # the first command to result round trip is somehow sometimes very slow
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_TARGET_SPEED, result.noun)
@@ -377,4 +377,26 @@ class TestStepperProcess(TestCase):
     def test_get_value_full_steps_per_rev(self):
         print("Test get_value() FULL_STEPS_PER_REV")
         self.process.start()
-        self.c_pipe.send(Command())
+
+        # Test Setter and Getter
+        self.c_pipe.send(Command(Verb.FULL_STEPS_PER_REV, 123))
+        self.c_pipe.send(Command(Verb.GET, Noun.VAL_FULL_STEPS_PER_REV))
+        if not self.r_pipe.poll(2):
+            self.fail()
+        result = self.r_pipe.recv()
+        self.assertEqual(Noun.VAL_FULL_STEPS_PER_REV, result.noun)
+        self.assertEqual(123, result.value)
+        self.c_pipe.send(Command(Verb.STOP, 0))
+        self.c_pipe.send(Command(Verb.QUIT, 0))
+        self.process.join()
+
+        # Check that rotational moves pick up the new value
+        self.process.steps_per_rev(1000)
+        self.process.moveto_deg(360)  # one rotation CW
+        self.assertEqual(1000, self.process.target_position)
+
+        self.process.zero()
+        self.process.steps_per_rev(2048)
+        self.process.microsteps = 2
+        self.process.move_deg(-360)
+        self.assertEqual(-4096, self.process.target_position)

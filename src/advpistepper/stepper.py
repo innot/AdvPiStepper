@@ -145,6 +145,7 @@ class Noun(Enum):
     VAL_TARGET_POSITION = auto()
     VAL_ACCELERATION = auto()
     VAL_DECELERATION = auto()
+    VAL_FULL_STEPS_PER_REV = auto()
 
 
 @dataclass
