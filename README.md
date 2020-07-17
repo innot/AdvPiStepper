@@ -1,12 +1,13 @@
 # AdvPiStepper
-AdvPiStepper is a driver for all kinds of stepper motors, written in Python for the Raspberry Pi.
+AdvPiStepper is a driver for all kinds of stepper motors, written in Python for the Raspberry Pi, using the pigpio library.
+
 
 ## Features
-* Uses acceleration and deceleration ramps
+* Uses acceleration and deceleration ramps.
 * Fairly tight timing up to {TBD} steps per second.
 * Complete API for relative and absolute moves, rotations and continuous running.
 * Runs in the background. Motor movements can be blocking or non-blocking.
-* Support for microstepping (depending on the driver)
+* Support for microstepping (depending on the driver).
 * Support for unipolar stepper motors
     * Like the cheap 28BYJ48 motor
 * {TODO} Support for Bipolar stepper drivers / dual H-Bridges like the
@@ -26,4 +27,9 @@ therefore has to be [installed manually](http://abyz.me.uk/rpi/pigpio/download.h
 
 ## Usage
 To use the AdvPiStepper {TODO}
+
+## Theory of Operation
+
+## History
+V0.9 Initial release
 

@@ -8,16 +8,18 @@
 #
 
 import sys
-from unittest import TestCase
+import unittest
 
 from advpistepper.stepper import *
 
 
-class TestStepperProcess(TestCase):
+class TestStepperProcess(unittest.TestCase):
     c_pipe = None
     r_pipe = None
+    idle_event = None
+    process = None
 
-    def setUp(self) -> None:
+    def setUp(self):
 
         driver = DriverBase()
 
@@ -79,17 +81,29 @@ class TestStepperProcess(TestCase):
         self.process.move(100)
         self.assertEqual(self.process.target_position, 100)
         self.assertTrue(self.process.move_required)
-        self.process.current_position = 100  # simulate that the move has completed
+        self.process.target_position = 100  # simulate that the move has completed
         self.process.move(-200)
         self.assertEqual(self.process.target_position, -100)
         self.assertTrue(self.process.move_required)
 
         # microsteps should not affect a normal move
         self.process.zero()
-        self.process.current_position = 0
+        self.process.target_position = 0
         self.process.microsteps = 10  # arbitrary and just for convenience
         self.process.move(999)
         self.assertEqual(self.process.target_position, 999)
+
+        # when in continuous mode a move should end it and move to
+        # a position relative to the current position
+        self.process.target_position = float('inf')
+        self.process.current_position = 1000
+        self.process.move(-500)
+        self.assertEqual(500, self.process.target_position)
+
+        self.process.target_position = float('-inf')
+        self.process.current_position = -1000
+        self.process.move(500)
+        self.assertEqual(-500, self.process.target_position)
 
     def test_move_deg(self):
         print("Test Command MOVE_DEG")
@@ -419,3 +433,7 @@ class TestStepperProcess(TestCase):
 
         self.c_pipe.send(Command(Verb.QUIT, 0))
         self.process.join()
+
+if __name__ == '__main__':
+    unittest.main()
+

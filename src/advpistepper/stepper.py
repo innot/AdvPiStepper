@@ -159,7 +159,7 @@ class Command(object):
     verb: Verb = None
     noun: Union[Noun, int, float] = None
 
-    def __init__(self, verb: Verb, noun: Union[Noun, int, float]):
+    def __init__(self, verb: Verb, noun: Union[Noun, int, float] = None):
         self.verb = verb
         self.noun = noun
 
@@ -205,7 +205,7 @@ class AdvPiStepper(object):
         # Get the default speed/accel/decel parameters from the driver
         params = driver.parameters
         if parameters is not None:
-            # User passed some parameters to extend or override the defaults.
+            # Use   r passed some parameters to extend or override the defaults.
             params.update(parameters)
 
         # setup and start the background process.
@@ -399,24 +399,102 @@ class AdvPiStepper(object):
 
         self._driver.microsteps = steps
 
-    def move(self, relative, speed=0):
+    def move(self, steps: int, speed: float = self.target_speed, block : bool = False):
         """
-        Move the given number of steps. Positiv for forward, negative for backwards.
-        This call blocks until all steps have been performed.
-        """
-        if speed == 0:
-            speed = self._param.max_speed
+        Move the given number of steps relative to a position.
 
-        self._target_position = self._current_position + relative
-        self.speed = speed
-        self._init_move(relative, speed)
-        self._main_loop()
+        If called while the motor is idle the move will be relative to the current
+        position. If the motor is already executing a move the new move will be
+        relative to the previous target position. If the motor is running in
+        continuous mode the new move will be relative to the current position.
+
+        :param steps:   Number of steps, full or microsteps.
+                        Positiv for forward / clockwise,
+                        negative for backwards / counterclockwise.
+        :type steps: int
+        :param speed:   Target speed in steps or microsteps per second.
+                        Must be >0. Optional, default is the most recent target speed.
+        :type speed: float
+        :param block:   When 'True' waits for the move to complete.
+                        Default 'False', i.e. call will return immediately.
+        :type block:    bool
+        :raises ValueError: if the speed is 0 or less.
+                """
+        if speed < 0:
+            raise ValueError(f"Argument speed must be > 0.0, was {speed}")
+        if not isinstance(steps, int):
+            raise ValueError(f"Argument steps must be an integer, was {type(steps).__name__}")
+
+        self.c_pipe.send(Command(Verb.SPEED, speed))
+        self.c_pipe.send(Command(Verb.MOVE, steps))
+
+        if block:
+            self._wait_for_idle()
 
     def move_to(self, absolut):
         """
-        Move to the given location. Use set_zero() to define the origin.
-        This function blocks until all steps have been performed."""
+        Move to the given location.
+
+        Use set_zero() to define the origin.
+        This function blocks until all steps have been performed.
+        """
         pass
+
+    def run(self, direction: int, speed: float = self.target_speed):
+        """
+        Run the motor constantly.
+
+        The motor will accelerate to and maintain a given speed. It will run
+        until either stopped with stop() or overriden by any move() / move_to()
+        call.
+        This method can only be run as non-blocking for obvious reasons.
+
+        :param direction: Direction of movement. Either CW (1) or CCW (-1).
+        :type direction: int
+        :param speed: Speed in steps per second. Optional, default is target_speed.
+        :type speed: float
+        :raises ValueError: if either the direction is not CW/CCW or if the speed
+                            is 0 or less.
+        """
+        if direction != CW and direction != CCW:
+            raise ValueError(f"Argument direction must be CW (1) or CCW (-1), was {direction}")
+        if speed < 0.0:
+            raise ValueError(f"Argument speed must be greater than 0.0, was {speed}")
+
+        self.c_pipe.send(Command(Verb.SPEED, speed))
+        self.c_pipe.send(Command(Verb.RUN, direction))
+
+    def stop(self, block: bool = False):
+        """
+        Decelerate the motor to a complete stop.
+
+        :param block:   When 'True' waits for the stop to complete.
+                        Default 'False', i.e. call will return immediately.
+        :type block:    bool
+        """
+        self.c_pipe.send(Command(Verb.STOP))
+        if block:
+            self._wait_for_idle()
+
+    def hardstop(self, block: bool = False):
+        """
+        Stops the motor immediately.
+
+        How the motor is stopped depends on the motor driver. Usually
+        the driver will just deenergize all motor coils.
+
+        Due to inertia calling this on a moving motor will probably cause
+        unaccounted motor steps. The current_position may not be accurate
+        anymore and it is up to the caller to get the motor to a consistent
+        state if so required.
+
+        :param block:   When 'True' waits for the driver to initiate the hard stop.
+                        Default 'False', i.e. call will return immediately.
+        :type block:    bool
+        """
+        self.c_pipe.send(Command(Verb.HARD_STOP))
+        if block:
+            self._wait_for_idle()
 
     def engage(self):
         self._driver.engage()
@@ -445,7 +523,7 @@ class AdvPiStepper(object):
         else:
             return result.value
 
-    def _wait_for_move(self):
+    def _wait_for_idle(self):
         self.idle_event.wait()
         self.idle_event.clear()  # rearm the flag for the next move
 
@@ -621,9 +699,16 @@ class StepperProcess(Process):
         self.microstep_change_at = None
 
     def move(self, relative):
-        self.target_position = self.current_position + relative
-        if relative != 0:
-            self.move_required = True
+        if self.target_position == float('inf') or self.target_position == float('-inf'):
+            # when in continuous mode we can only reference the current position
+            self.target_position = self.current_position + relative
+        else:
+            # otherwise reference of the current target_position.
+            # when at idle this should be the same as the current_position.
+            self.target_position += relative
+            if relative != 0:
+                self.move_required = True
+
 
     def move_deg(self, angle: float):
         steps_per_deg = (self.microsteps * self.full_steps_per_rev) / 360
