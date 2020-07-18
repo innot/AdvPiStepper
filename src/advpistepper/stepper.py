@@ -130,6 +130,10 @@ class Verb(Enum):
     # end process
     QUIT = auto()
 
+    # Coil control
+    ENGAGE = auto()
+    RELEASE = auto()
+
     # get value. The Noun contains the ID of the value. The value is returned via the results Pipe.
     GET = auto()
 
@@ -219,6 +223,11 @@ class AdvPiStepper(object):
         self.c_pipe.send(Command(Verb.NOP, 0))  # Just to get the pipe opened and ready for action
 
         self.parameters = params  # keep the current parameters for reference
+
+    def __del__(self):
+        if self.process.is_alive():
+            # terminate the stepper process
+            self.close()
 
     @property
     def target_speed(self) -> float:
@@ -397,9 +406,9 @@ class AdvPiStepper(object):
             raise ValueError(
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
-        self._driver.microsteps = steps
+        self.c_pipe.send(Command(Verb.MICROSTEPS, steps))
 
-    def move(self, steps: int, speed: float = self.target_speed, block : bool = False):
+    def move(self, steps: int, speed: float = None, block: bool = False):
         """
         Move the given number of steps relative to a position.
 
@@ -420,6 +429,8 @@ class AdvPiStepper(object):
         :type block:    bool
         :raises ValueError: if the speed is 0 or less.
                 """
+        if speed is None:
+            speed = self.target_speed
         if speed < 0:
             raise ValueError(f"Argument speed must be > 0.0, was {speed}")
         if not isinstance(steps, int):
@@ -440,7 +451,7 @@ class AdvPiStepper(object):
         """
         pass
 
-    def run(self, direction: int, speed: float = self.target_speed):
+    def run(self, direction: int, speed: float = 0.0):
         """
         Run the motor constantly.
 
@@ -456,6 +467,9 @@ class AdvPiStepper(object):
         :raises ValueError: if either the direction is not CW/CCW or if the speed
                             is 0 or less.
         """
+        if speed == 0.0:
+            speed = self.target_speed
+
         if direction != CW and direction != CCW:
             raise ValueError(f"Argument direction must be CW (1) or CCW (-1), was {direction}")
         if speed < 0.0:
@@ -496,11 +510,54 @@ class AdvPiStepper(object):
         if block:
             self._wait_for_idle()
 
-    def engage(self):
-        self._driver.engage()
+    def engage(self, block: bool = False):
+        """
+        Energize the coils of the stepper motor.
 
-    def disengage(self):
-        self._driver.release()
+        The coils are automatically engaged by any move / run command.
+        This mehtod should not be called while the motor is already moving.
+
+        :param block:   When 'True' waits for the driver to energize.
+                        Default 'False', i.e. call will return immediately.
+        :type block:    bool
+        """
+        self.c_pipe.send(Command(Verb.ENGAGE))
+        if block:
+            self._wait_for_idle()
+
+    def release(self, block: bool = False):
+        """
+        Deenergize the coils of the stepper motor.
+
+        Deenergizing the coils will stop the motor from converting current
+        into heat at the expense of yreduced holding torque.
+        Also, when using microsteps the motor may (or may not) move to an
+        adjacent full step.
+
+        Calling this method while a move is underway is similar to a hard stop.
+
+
+        :param block:   When 'True' waits for the driver to release.
+                        Default 'False', i.e. call will return immediately.
+        :type block:    bool
+
+        """
+        self.c_pipe.send(Command(Verb.RELEASE))
+        if block:
+            self._wait_for_idle()
+
+    def close(self):
+        """
+        End the stepper driver.
+
+        All resources are released.
+        This is called automatically when the AdvPiStepper object is garbage collected.
+        """
+        self.c_pipe.send(Command(Verb.QUIT))
+        time.sleep(0.1)
+        self.c_pipe.close()
+        self.r_pipe.close()
+        self.process.join()
 
     def _get_value(self, noun: Noun) -> Union[int, float, bool]:
         """Retrieve the given parameter from the stepper process.
@@ -571,6 +628,10 @@ class StepperProcess(Process):
         self.microstep_change_at = None
         self.microstep_new_value = None
 
+        # connect to pigpio daemon
+        self.pi = None
+        self.connect_pigpio()
+
     def run(self):
         # connect to pigpio once we have started as a process.
         # pigpio.pi can not be pickled and can therefore not be passed
@@ -611,9 +672,9 @@ class StepperProcess(Process):
         elif verb == Verb.MOVETO:
             self.moveto(int(noun))
         elif verb == Verb.MOVETO_DEG:
-            self.moveto_deg(float(noun[0]))
+            self.moveto_deg(float(noun))
         elif verb == Verb.RUN:
-            self.continuous(int(noun[1]))
+            self.continuous(int(noun))
         elif verb == Verb.STOP:
             self.stop()
         elif verb == Verb.ZERO:
@@ -622,6 +683,10 @@ class StepperProcess(Process):
             self.hard_stop()
         elif verb == Verb.QUIT:
             self.quit()
+        elif verb == Verb.ENGAGE:
+            self.engage()
+        elif verb == Verb.RELEASE:
+            self.release()
         elif verb == Verb.GET:
             self.get_value(noun)
         elif verb == Verb.NOP:
@@ -643,7 +708,7 @@ class StepperProcess(Process):
             # Austin Eq.16, Changes of accelaration
             self.cd.step = (speed * speed) / (2.0 * self.acceleration)
             self.cd.state = INC
-        elif speed < old_speed and self.cd.state != DECEL:
+        elif speed < old_speed and (self.cd.state == RUN or self.cd.state == INC):
             # see above, with negativ sign to cause a deceleration
             self.cd.step = -(speed * speed) / (2.0 * self.deceleration)
             self.cd.state = DEC
@@ -674,7 +739,7 @@ class StepperProcess(Process):
 
         self.microstep_new_value = steps
 
-        if c == 0:
+        if c_steps == 0:
             self._perform_microstep_change()
             change_pos = self.current_position
         else:
@@ -708,7 +773,6 @@ class StepperProcess(Process):
             self.target_position += relative
             if relative != 0:
                 self.move_required = True
-
 
     def move_deg(self, angle: float):
         steps_per_deg = (self.microsteps * self.full_steps_per_rev) / 360
@@ -813,6 +877,15 @@ class StepperProcess(Process):
 
     def quit(self):
         self.quit_now = True
+
+    def engage(self):
+        # just pass on to the driver
+        self.driver.engage()
+
+    def release(self):
+        # Tell the driver to release the coils
+        self.driver.release()
+        self.hard_stop()  # stop any movements
 
     def get_value(self, noun: Noun):
 

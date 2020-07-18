@@ -10,7 +10,7 @@
 
 import unittest
 
-import advpistepper.stepper
+import advpistepper.stepper as stepper
 
 
 class MyTestCase(unittest.TestCase):
@@ -20,7 +20,7 @@ class MyTestCase(unittest.TestCase):
         pass
 
     def test_target_speed(self):
-        apis = advpistepper.AdvPiStepper()
+        apis = stepper.AdvPiStepper()
         test = (1234, 1.0, 0.1, 1000000)
         for v in test:
             apis.target_speed = v
@@ -31,8 +31,20 @@ class MyTestCase(unittest.TestCase):
             apis.target_speed = -1
 
         # test speed change during a run
-        apis.run(1000)
+        apis.run(stepper.CW, 1000)
         self.assertEqual(1000, apis.target_speed)
+        apis.stop()
+
+    def test_move(self):
+        pass
+
+    def test_close(self):
+        apis = stepper.AdvPiStepper()
+        apis.close()
+        self.assertFalse(apis.process.is_alive())
+
+        apis = stepper.AdvPiStepper()
+        del apis    # should not throw any errors.
 
 
 if __name__ == '__main__':

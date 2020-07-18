@@ -122,7 +122,7 @@ class TestStepperProcess(unittest.TestCase):
 
         # microstepping should affect the move_deg
         self.process.zero()
-        self.process.current_position = 0
+        self.process.current_position = self.process.target_position = 0
         self.process.microsteps = 10  # again, arbitrary and just for convenience
         self.process.move_deg(45)
         self.assertEqual(self.process.target_position, 450)
@@ -410,6 +410,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.moveto_deg(360)  # one rotation CW
         self.assertEqual(1000, self.process.target_position)
 
+        self.process.target_position = 0
         self.process.zero()
         self.process.set_full_steps_per_rev(2048)
         self.process.microsteps = 2
@@ -434,6 +435,13 @@ class TestStepperProcess(unittest.TestCase):
         self.c_pipe.send(Command(Verb.QUIT, 0))
         self.process.join()
 
+    def test_engage_release(self):
+        self.assertFalse(self.process.driver.engaged)  # default after startup
+        self.process.engage()
+        self.assertTrue(self.process.driver.engaged)
+        self.process.release()
+        self.assertFalse(self.process.driver.engaged)
+
+
 if __name__ == '__main__':
     unittest.main()
-

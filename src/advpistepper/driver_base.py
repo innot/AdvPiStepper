@@ -34,6 +34,9 @@ class DriverBase(object):
         """Flag to indicate that the driver has been initialized and the
         GPIO pins have been set up."""
 
+        self.engaged = False
+        """Falg to indicate that the driver is engaged, i.e. current is supplied to the coils."""
+
         self._pi = None
         """pigpio handle. This value is set when the init() method is called from the
         stepper controller with a pigpio reference."""
@@ -124,11 +127,11 @@ class DriverBase(object):
 
     def engage(self):
         """Energize the coils."""
-        pass
+        self.engaged = True
 
     def release(self):
         """Deenergize all coils."""
-        pass
+        self.engaged = False
 
     @property
     def direction(self) -> int:
@@ -204,6 +207,6 @@ class DriverBase(object):
         multiple stepper motor pulses already in the pipeline that will
         be transmitted even after a call to hard_stop().
         Subclasses should take care that these pulses do not cause any
-        further motor movement, e.g. by setting the GPIO pins to input.
+        further motor movement, e.g. by deactivtiong any GPIO output.
         """
         self.release()
