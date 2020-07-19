@@ -230,6 +230,39 @@ class AdvPiStepper(object):
             self.close()
 
     @property
+    def current_position(self) -> int:
+        """
+        Get the current position of the motor.
+
+        The position will be in steps or microsteps from the origin.
+
+        While the motor is running the reported current position might lag the true current position
+        by 1 or more steps due to the asynchrounous nature of AdvPiStepper.
+
+        This property is read-only.
+
+        :returns: the current motor position in steps / microsteps.
+        :rtype: int
+        """
+        result = int(self._get_value(Noun.VAL_CURRENT_POSITION))
+        return result
+
+    @property
+    def target_position(self) -> int:
+        """
+        Get the current target position of the driver.
+
+        This is the position the stepper driver is currently moving to.
+
+        This property is read-only.
+
+        :return: the target position in steps / microsteps from origin.
+        :rtype: int
+        """
+        result = int(self._get_value(Noun.VAL_TARGET_POSITION))
+        return result
+
+    @property
     def target_speed(self) -> float:
         """
         Get the selected target speed.
@@ -267,10 +300,13 @@ class AdvPiStepper(object):
     def current_speed(self) -> float:
         """
         Get the current speed.
+
         During acceleration / deceleration the current speed will be
         less than the target speed. Also during accel/decels and due
         to the asynchronous nature of AdvPiStepper the returned value
-        might be a microseconds old and therefore outdated.
+        might be a microseconds old and therefore not accurate.
+
+        This property is read-only.
 
         :return: The speed in steps or microsteps per second
         :rtype: float
@@ -510,6 +546,16 @@ class AdvPiStepper(object):
         if block:
             self._wait_for_idle()
 
+    def zero(self):
+        """
+        Reset the current position to 0.
+
+        If called during a move the move will not be affected, i.e. it will continue
+        for the given number of steps. But after it has finished the current position
+        will be the number of steps performed since the call to zero().
+        """
+        self.c_pipe.send(Command(Verb.ZERO))
+
     def engage(self, block: bool = False):
         """
         Energize the coils of the stepper motor.
@@ -553,11 +599,15 @@ class AdvPiStepper(object):
         All resources are released.
         This is called automatically when the AdvPiStepper object is garbage collected.
         """
-        self.c_pipe.send(Command(Verb.QUIT))
-        time.sleep(0.1)
-        self.c_pipe.close()
-        self.r_pipe.close()
-        self.process.join()
+        try:
+            self.c_pipe.send(Command(Verb.QUIT))
+            time.sleep(0.1)
+            self.c_pipe.close()
+            self.r_pipe.close()
+            self.process.join()
+        except(EOFError, OSError):
+            # maybe the object is already closed.
+            pass
 
     def _get_value(self, noun: Noun) -> Union[int, float, bool]:
         """Retrieve the given parameter from the stepper process.
@@ -581,8 +631,10 @@ class AdvPiStepper(object):
             return result.value
 
     def _wait_for_idle(self):
-        self.idle_event.wait()
         self.idle_event.clear()  # rearm the flag for the next move
+        print("apis: idle event cleared")
+        result = self.idle_event.wait()
+        print(f"apis: idle wait returned {result}")
 
 
 class StepperProcess(Process):
@@ -628,9 +680,9 @@ class StepperProcess(Process):
         self.microstep_change_at = None
         self.microstep_new_value = None
 
-        # connect to pigpio daemon
+        # do not connect to pigpio yet as pigpio uses a lock which can not be
+        # pickeled and therefore not be spawned / forked.
         self.pi = None
-        self.connect_pigpio()
 
     def run(self):
         # connect to pigpio once we have started as a process.
@@ -914,13 +966,16 @@ class StepperProcess(Process):
         try:
             while not self.quit_now:
                 self.idle_event.set()  # Tell the world that we are twiddeling our thumbs
-                self.c_pipe.poll(None)  # Wait for command
-                command = self.c_pipe.recv()
-                self.command_handler(command)
-                if self.move_required:
-                    self.idle_event.clear()  # ... but not anymore
-                    self.busy_loop()
-                    self.move_required = False
+                # print("idle event set")
+                pipedata = self.c_pipe.poll(0.1)  # Wait for command, occasionally
+                if pipedata:
+                    self.idle_event.clear()
+                    # print("idle event cleared")
+                    command = self.c_pipe.recv()
+                    self.command_handler(command)
+                    if self.move_required:
+                        self.busy_loop()
+                        self.move_required = False
         except EOFError:
             # the other end has closed the pipe.
             # clean up and go home
@@ -1020,7 +1075,7 @@ class StepperProcess(Process):
 
         # determine the number of steps to come to a full stop from
         # the current speed. [1] Equation 16
-        decel_steps = int(((data.speed * data.speed) / (2 * self.deceleration)) + 0.5)
+        decel_steps = int(((data.speed * data.speed) / (2 * self.deceleration)))
         data.decel_steps = decel_steps
 
         if delta_position == 0 and decel_steps <= 1:
@@ -1072,6 +1127,6 @@ class StepperProcess(Process):
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
-        print(f"{delta_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
+        # print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
 
         return int(data.c_n)
