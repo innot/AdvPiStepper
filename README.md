@@ -1,6 +1,9 @@
 # AdvPiStepper
 AdvPiStepper is a driver for all kinds of stepper motors, written in Python for the Raspberry Pi, using the pigpio library.
 
+**ATTENTION** this program is not finished. It was uploaded to GitHub as a backup.
+Feel free to look at the source code and give feedback, but do not expect it to work
+in any shape or form.
 
 ## Features
 * Uses acceleration and deceleration ramps.
@@ -31,5 +34,5 @@ To use the AdvPiStepper {TODO}
 ## Theory of Operation
 
 ## History
-V0.9 Initial release
+V0.1 Work in Progress - Not officially released
 
