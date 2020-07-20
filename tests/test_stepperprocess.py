@@ -339,7 +339,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.start()
         self.c_pipe.send(Command(Verb.ACCELERATION, 1234))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_ACCELERATION))
-        if not self.r_pipe.poll(1):
+        if not self.r_pipe.poll(2):
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_ACCELERATION, result.noun)
@@ -352,7 +352,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.start()
         self.c_pipe.send(Command(Verb.DECELERATION, 2345))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_DECELERATION))
-        if not self.r_pipe.poll(1):
+        if not self.r_pipe.poll(2):
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_DECELERATION, result.noun)
