@@ -7,7 +7,7 @@ in any shape or form.
 
 ## Features
 * Uses acceleration and deceleration ramps.
-* Fairly tight timing up to {TBD} steps per second.
+* Fairly tight timing up to approx. 3000 steps per second (on Raspberry Pi 4).
 * Complete API for relative and absolute moves, rotations and continuous running.
 * Runs in the background. Motor movements can be blocking or non-blocking.
 * Support for microstepping (depending on the driver).
@@ -25,7 +25,7 @@ in any shape or form.
 
 ## Requirements
 AdvPiStepper uses the [pigpio](http://abyz.me.uk/rpi/pigpio/) library to access the Raspberry Pi GPIO pins.
-It requires V76 of the library, which at the time of writing has not yet been uploaded to the PyPI archive and
+It requires at least V76 of the library, which at the time of writing has not yet been uploaded to the PyPI archive and
 therefore has to be [installed manually](http://abyz.me.uk/rpi/pigpio/download.html).
 
 ## Usage

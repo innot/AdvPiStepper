@@ -19,7 +19,6 @@ from enum import Enum, auto
 from math import sqrt
 from typing import Dict, Any, Union
 
-
 from .common import *
 from .driver_base import DriverBase
 
@@ -296,6 +295,7 @@ class AdvPiStepper(object):
 
         cmd = Command(Verb.SPEED, speed)
         self.c_pipe.send(cmd)
+        self._wait_for_acknowledge()
 
     @property
     def current_speed(self) -> float:
@@ -346,6 +346,7 @@ class AdvPiStepper(object):
 
         cmd = Command(Verb.ACCELERATION, rate)
         self.c_pipe.send(cmd)
+        self._wait_for_acknowledge()
 
     @property
     def deceleration(self):
@@ -378,6 +379,7 @@ class AdvPiStepper(object):
 
         cmd = Command(Verb.DECELARATION, rate)
         self.c_pipe.send(cmd)
+        self._wait_for_acknowledge()
 
     @property
     def full_steps_per_rev(self) -> int:
@@ -409,6 +411,7 @@ class AdvPiStepper(object):
 
         cmd = Command(Verb.FULL_STEPS_PER_REV, steps)
         self.c_pipe.send(cmd)
+        self._wait_for_acknowledge()
 
     @property
     def microsteps(self) -> int:
@@ -445,6 +448,7 @@ class AdvPiStepper(object):
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
         self.c_pipe.send(Command(Verb.MICROSTEPS, steps))
+        self._wait_for_acknowledge()
 
     def move(self, steps: int, speed: float = None, block: bool = False):
         """
@@ -475,7 +479,9 @@ class AdvPiStepper(object):
             raise ValueError(f"Argument steps must be an integer, was {type(steps).__name__}")
 
         self.c_pipe.send(Command(Verb.SPEED, speed))
+        self._wait_for_acknowledge()
         self.c_pipe.send(Command(Verb.MOVE, steps))
+        self._wait_for_acknowledge()
 
         if block:
             self._wait_for_idle()
@@ -514,7 +520,9 @@ class AdvPiStepper(object):
             raise ValueError(f"Argument speed must be greater than 0.0, was {speed}")
 
         self.c_pipe.send(Command(Verb.SPEED, speed))
+        self._wait_for_acknowledge()
         self.c_pipe.send(Command(Verb.RUN, direction))
+        self._wait_for_acknowledge()
 
     def stop(self, block: bool = False):
         """
@@ -525,6 +533,7 @@ class AdvPiStepper(object):
         :type block:    bool
         """
         self.c_pipe.send(Command(Verb.STOP))
+        self._wait_for_acknowledge()
         if block:
             self._wait_for_idle()
 
@@ -545,6 +554,7 @@ class AdvPiStepper(object):
         :type block:    bool
         """
         self.c_pipe.send(Command(Verb.HARD_STOP))
+        self._wait_for_acknowledge()
         if block:
             self._wait_for_idle()
 
@@ -557,6 +567,7 @@ class AdvPiStepper(object):
         will be the number of steps performed since the call to zero().
         """
         self.c_pipe.send(Command(Verb.ZERO))
+        self._wait_for_acknowledge()
 
     def engage(self, block: bool = False):
         """
@@ -570,6 +581,7 @@ class AdvPiStepper(object):
         :type block:    bool
         """
         self.c_pipe.send(Command(Verb.ENGAGE))
+        self._wait_for_acknowledge()
         if block:
             self._wait_for_idle()
 
@@ -591,6 +603,7 @@ class AdvPiStepper(object):
 
         """
         self.c_pipe.send(Command(Verb.RELEASE))
+        self._wait_for_acknowledge()
         if block:
             self._wait_for_idle()
 
@@ -603,6 +616,7 @@ class AdvPiStepper(object):
         """
         try:
             self.c_pipe.send(Command(Verb.QUIT))
+            self._wait_for_acknowledge()
             time.sleep(0.1)
             self.c_pipe.close()
             self.r_pipe.close()
@@ -624,6 +638,7 @@ class AdvPiStepper(object):
 
         cmd = Command(Verb.GET, noun)
         self.c_pipe.send(cmd)
+        self._wait_for_acknowledge()
         self.r_pipe.poll(1)  # if no result after 1 second then the other Process is stuck
         result = self.r_pipe.recv()
         if result.noun != noun:
@@ -633,10 +648,14 @@ class AdvPiStepper(object):
             return result.value
 
     def _wait_for_idle(self):
-        self.idle_event.clear()  # rearm the flag for the next move
-        print("apis: idle event cleared")
         result = self.idle_event.wait()
-        print(f"apis: idle wait returned {result}")
+
+    def _wait_for_acknowledge(self):
+        ack = self.c_pipe.poll(3.0)
+        if ack:
+            result = self.c_pipe.recv()
+        else:
+            raise EOFError("Command not acknowledged after 3 second. Maxbe backend down?")
 
 
 class StepperProcess(multiprocessing.Process):
@@ -752,6 +771,9 @@ class StepperProcess(multiprocessing.Process):
         else:
             raise RuntimeError(f"Received unknown command {command}")
 
+        # Acknowledge to the frontend that the command has been received and processed.
+        self.c_pipe.send(Result(Noun.VAL_TARGET_POSITION, self.target_position))
+
     def set_speed(self, speed):
         old_speed = self.cd.target_speed
         if speed == old_speed:
@@ -762,7 +784,7 @@ class StepperProcess(multiprocessing.Process):
         # if yes, then accelerate / decelerate, but only if not already
         # accelerating or decelarating to a step
         if speed > old_speed and (self.cd.state == RUN or self.cd.state == DEC):
-            # Austin Eq.16, Changes of accelaration
+            # Austin Eq.16, Changes of acceleration
             self.cd.step = int((speed * speed) / (2.0 * self.acceleration))
             self.cd.state = INC
         elif speed < old_speed and (self.cd.state == RUN or self.cd.state == INC):
@@ -971,17 +993,14 @@ class StepperProcess(multiprocessing.Process):
         try:
             while not self.quit_now:
                 self.idle_event.set()  # Tell the world that we are twiddeling our thumbs
-                # print("idle event set")
-                pipedata = self.c_pipe.poll(0.1)  # Wait for command, occasionally
+                pipedata = self.c_pipe.poll(0.1)  # Wait for command
                 if pipedata:
                     self.idle_event.clear()
-                    # print("idle event cleared")
                     command = self.c_pipe.recv()
                     self.command_handler(command)
                     if self.move_required:
                         self.busy_loop()
                         self.move_required = False
-            print("Idle loop finished")
         except EOFError:
             # the other end has closed the pipe.
             # clean up and go home
@@ -1068,7 +1087,6 @@ class StepperProcess(multiprocessing.Process):
                 current_wave_id = next_wave_id
 
             # end of loop
-            print("Busy loop finished")
 
         except BrokenPipeError:
             # Command pipe was closed - the other end has terminated

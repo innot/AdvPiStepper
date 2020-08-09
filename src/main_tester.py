@@ -8,8 +8,7 @@ import sys
 import pigpio
 import time
 
-from advpistepper.stepper import AdvPiStepper
-from advpistepper.driver_unipolar_28byj48 import Driver28BYJ48
+import advpistepper as apis
 
 
 def main(argv):
@@ -19,19 +18,26 @@ def main(argv):
     else:
         steps = 1000
 
-    drv_28byj48 = Driver28BYJ48(pink=17, orange=22, yellow=27, blue=4)
+    drv_28byj48 = apis.Driver28BYJ48(pink=23, orange=25, yellow=24, blue=22)
 
-    stepper = AdvPiStepper(drv_28byj48)
+    stepper = apis.AdvPiStepper(drv_28byj48)
 
     stepper.microsteps = 2
 
     stepper.engage()
+    stepper.move(100, 100)
+
+    time.sleep(2)
+
+    stepper.release()
+
+    quit(0)
 
     stepper.target_speed = 100
 
     stepper.run(1)
 
-    for i in range(15):
+    for i in range(10):
         time.sleep(1.0)
         stepper.target_speed = 100+(i * 100)
 

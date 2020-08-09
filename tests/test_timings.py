@@ -32,8 +32,8 @@ class TestTimings(unittest.TestCase):
 
     def test_max_speed(self):
         tolerance = 10  # percent
-        speed = 1000  # Hz
-        steps = 2000  # steps per iteration
+        speed = 100  # Hz
+        steps = 500  # steps per iteration
 
         while True:
             driver = ConstantDelayDriver(1000000 / speed)
@@ -53,9 +53,10 @@ class TestTimings(unittest.TestCase):
 
             target = (1000000 / speed) * steps
             diff_abs = int(dt - target)
-            diff_percent = (diff_abs/target)*100
+            diff_percent = (diff_abs / target) * 100
 
-            print(f"{steps} Steps @ {speed}Hz should take {target} us, took: {dt} us. Diff {diff_abs}us = {diff_percent}%")
+            print(
+                f"{steps} Steps @ {speed}Hz should take {target} us, took: {dt} us. Diff {diff_abs}us = {diff_percent}%")
 
             process.close()
 
