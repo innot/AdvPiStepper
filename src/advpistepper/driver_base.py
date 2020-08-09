@@ -12,7 +12,7 @@ from advpistepper.common import *
 
 
 class DriverBase(object):
-    defaults: Dict[str, Any] = {
+    db_defaults: Dict[str, Any] = {
         MAX_SPEED: 1000.0,
         MAX_TORQUE_SPEED: 100.0,
         ACCELERATION_RATE: 1000,
@@ -23,7 +23,7 @@ class DriverBase(object):
     }
 
     def __init__(self, parameters: Dict[str, Any] = None):
-        self._parameters: Dict[str, Any] = self.defaults  # default values
+        self._parameters: Dict[str, Any] = self.db_defaults  # default values
         if parameters is not None:
             self._parameters.update(parameters)  # replace defaults with custom values
 

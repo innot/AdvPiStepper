@@ -9,6 +9,7 @@
 
 import sys
 import unittest
+import multiprocessing
 
 from advpistepper.stepper import *
 
@@ -23,9 +24,9 @@ class TestStepperProcess(unittest.TestCase):
 
         driver = DriverBase()
 
-        c_pipe_remote, self.c_pipe = Pipe()
-        self.r_pipe, r_pipe_remote = Pipe()
-        self.idle_event = Event()
+        c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
+        self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
+        self.idle_event = multiprocessing.Event()
 
         self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.idle_event, driver)
 

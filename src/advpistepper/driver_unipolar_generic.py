@@ -6,7 +6,7 @@ HALFSTEP = 2
 
 
 class UnipolarDriver(DriverBase):
-    defaults: Dict[str, Any] = {
+    ud_defaults: Dict[str, Any] = {
         MAX_SPEED: 1000.0,
         MAX_TORQUE_SPEED: 100.0,
         ACCELERATION_RATE: 2000,
@@ -60,7 +60,7 @@ class UnipolarDriver(DriverBase):
         :type parameters: dict, optional
         """
 
-        p: Dict[str, Any] = self.defaults  # default values
+        p: Dict[str, Any] = self.ud_defaults  # default values
         if parameters is not None:
             p.update(parameters)  # replace defaults with custom values
 

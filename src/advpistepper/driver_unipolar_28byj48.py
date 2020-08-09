@@ -45,6 +45,7 @@ class Driver28BYJ48(UnipolarDriver):
     """
 
     defaults: Dict[str, Any] = {
+        "drivername": "28BYJ48",
         MAX_SPEED: 600.0,
         MAX_TORQUE_SPEED: 120.0,
         ACCELERATION_RATE: 2000,

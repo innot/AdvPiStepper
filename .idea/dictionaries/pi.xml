@@ -5,6 +5,7 @@
       <w>decel</w>
       <w>microstep</w>
       <w>microsteps</w>
+      <w>pigpio</w>
     </words>
   </dictionary>
 </component>

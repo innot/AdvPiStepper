@@ -6,6 +6,7 @@ Created on 11.06.2020
 
 import sys
 import pigpio
+import time
 
 from advpistepper.stepper import AdvPiStepper
 from advpistepper.driver_unipolar_28byj48 import Driver28BYJ48
@@ -16,23 +17,29 @@ def main(argv):
     if len(argv) > 1:
         steps = int(argv[1])
     else:
-        steps = -10
+        steps = 1000
 
-    drv_28byj48 = Driver28BYJ48(pink=18, orange=14, yellow=15, blue=17)
+    drv_28byj48 = Driver28BYJ48(pink=17, orange=22, yellow=27, blue=4)
 
-    pi_drv = pigpio.pi()
+    stepper = AdvPiStepper(drv_28byj48)
 
-    stepper = AdvPiStepper(pi_drv, drv_28byj48)
+    stepper.microsteps = 2
 
     stepper.engage()
 
-    stepper.move(steps)
-    
-#    stepper.move(3)
+    stepper.target_speed = 100
 
- #   stepper.move(3)
+    stepper.run(1)
 
-    stepper.disengage()
+    for i in range(15):
+        time.sleep(1.0)
+        stepper.target_speed = 100+(i * 100)
+
+    stepper.stop(True)
+
+#    stepper.move(1000, 1, True)
+
+    stepper.release()
 
 
 if __name__ == '__main__':

@@ -11,13 +11,14 @@
 """ Stepper Driver"""
 
 import time
+import multiprocessing
+import pigpio
+
 from dataclasses import dataclass
 from enum import Enum, auto
 from math import sqrt
-from multiprocessing import Process, Pipe, Event
 from typing import Dict, Any, Union
 
-import pigpio
 
 from .common import *
 from .driver_base import DriverBase
@@ -213,9 +214,9 @@ class AdvPiStepper(object):
             params.update(parameters)
 
         # setup and start the background process.
-        c_pipe_remote, self.c_pipe = Pipe()
-        self.r_pipe, r_pipe_remote = Pipe()
-        self.idle_event = Event()
+        c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
+        self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
+        self.idle_event = multiprocessing.Event()
 
         self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.idle_event, driver, params)
 
@@ -439,6 +440,7 @@ class AdvPiStepper(object):
         :param steps: 
         """
         if steps not in self.parameters[MICROSTEP_OPTIONS]:
+            print(self.parameters)
             raise ValueError(
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
@@ -637,9 +639,10 @@ class AdvPiStepper(object):
         print(f"apis: idle wait returned {result}")
 
 
-class StepperProcess(Process):
+class StepperProcess(multiprocessing.Process):
 
-    def __init__(self, command_pipe: Pipe, results_pipe: Pipe, idle_event: Event, driver: DriverBase = None,
+    def __init__(self, command_pipe: multiprocessing.Pipe, results_pipe: multiprocessing.Pipe,
+                 idle_event: multiprocessing.Event, driver: DriverBase = None,
                  parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
@@ -648,8 +651,8 @@ class StepperProcess(Process):
             self.params.update(parameters)  # replace defaults with custom values
 
         # store the arguments
-        self.c_pipe: Pipe = command_pipe
-        self.r_pipe: Pipe = results_pipe
+        self.c_pipe = command_pipe
+        self.r_pipe = results_pipe
         self.idle_event = idle_event
         self.driver = driver
 
@@ -707,6 +710,8 @@ class StepperProcess(Process):
         verb = command.verb
         noun = command.noun
 
+        print(f"received verb={verb}, noun={noun}")
+
         if verb == Verb.SPEED:
             self.set_speed(float(noun))
         elif verb == Verb.ACCELERATION:
@@ -758,11 +763,11 @@ class StepperProcess(Process):
         # accelerating or decelarating to a step
         if speed > old_speed and (self.cd.state == RUN or self.cd.state == DEC):
             # Austin Eq.16, Changes of accelaration
-            self.cd.step = (speed * speed) / (2.0 * self.acceleration)
+            self.cd.step = int((speed * speed) / (2.0 * self.acceleration))
             self.cd.state = INC
         elif speed < old_speed and (self.cd.state == RUN or self.cd.state == INC):
             # see above, with negativ sign to cause a deceleration
-            self.cd.step = -(speed * speed) / (2.0 * self.deceleration)
+            self.cd.step = int(-(speed * speed) / (2.0 * self.deceleration))
             self.cd.state = DEC
 
         # Set the actual target parameter
@@ -976,6 +981,7 @@ class StepperProcess(Process):
                     if self.move_required:
                         self.busy_loop()
                         self.move_required = False
+            print("Idle loop finished")
         except EOFError:
             # the other end has closed the pipe.
             # clean up and go home
@@ -1062,7 +1068,9 @@ class StepperProcess(Process):
                 current_wave_id = next_wave_id
 
             # end of loop
-        except EOFError:
+            print("Busy loop finished")
+
+        except BrokenPipeError:
             # Command pipe was closed - the other end has terminated
             # close shop and go home
             return
@@ -1110,7 +1118,7 @@ class StepperProcess(Process):
 
             data.state = ACCEL
 
-        elif data.state == ACCEL:
+        elif data.state == ACCEL or data.state == INC:
             data.c_n = data.c_n - ((2.0 * data.c_n) / ((4.0 * data.step) + 1))
 
             if data.c_n <= data.c_target:
@@ -1120,13 +1128,13 @@ class StepperProcess(Process):
             else:
                 data.step += 1
 
-        elif data.state == DECEL:
+        elif data.state == DECEL or data.state == DEC:
             data.c_n = data.c_n - ((2.0 * data.c_n) / ((4.0 * data.step) + 1))
             data.step += 1
 
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
-        # print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
+        print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
 
         return int(data.c_n)
