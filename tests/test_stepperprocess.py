@@ -11,7 +11,7 @@ import sys
 import unittest
 import multiprocessing
 
-from advpistepper.stepper import *
+from advpistepper import *
 
 
 class TestStepperProcess(unittest.TestCase):

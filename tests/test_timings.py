@@ -15,7 +15,7 @@ import unittest
 import pigpio
 
 import advpistepper
-import advpistepper.stepper as stepper
+import advpistepper as stepper
 
 
 class ConstantDelayDriver(advpistepper.driver_base.DriverBase):

@@ -7,10 +7,9 @@
 #  to https://opensource.org/licenses/MIT for a text of the license.
 #
 #
-import time
 import unittest
 
-import advpistepper.stepper as stepper
+import advpistepper as stepper
 
 
 class MyTestCase(unittest.TestCase):

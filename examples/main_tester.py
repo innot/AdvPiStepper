@@ -5,7 +5,6 @@ Created on 11.06.2020
 '''
 
 import sys
-import pigpio
 import time
 
 import advpistepper as apis
