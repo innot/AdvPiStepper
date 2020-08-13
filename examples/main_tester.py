@@ -21,10 +21,10 @@ def main(argv):
 
     stepper = apis.AdvPiStepper(drv_28byj48)
 
-    stepper.microsteps = 2
+    stepper.microsteps = 1
 
     stepper.engage()
-    stepper.move(100, 100)
+    stepper.move(-100, 50)
 
     time.sleep(2)
 

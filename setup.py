@@ -20,12 +20,12 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-
 setuptools.setup(
     name='AdvPiStepper',
     version='0.9.0.dev1',
     packages=setuptools.find_packages(),
-    install_requires=['pigpio'],
+    install_requires=['pigpio>=1.47'],
+    python_requires='>=3.7',
     url='https://github.com/innot/AdvPiStepper',
     license='MIT',
     author='Thomas Holland',
@@ -40,5 +40,10 @@ setuptools.setup(
         "Programming Language :: Python :: 3.7",
         "Topic :: System :: Hardware :: Hardware Drivers"
     ],
-    python_requires='>=3.7',
+    keywords='stepper motor driver raspberry pi pigpio 28byj48',
+    project_urls={
+        'Documentation': 'https://github.com/innot/AdvPiStepper/wiki',
+        'Source': 'https://github.com/innot/AdvPiStepper',
+        'Tracker': 'https://github.com/innot/AdvPiStepper/issues',
+    },
 )

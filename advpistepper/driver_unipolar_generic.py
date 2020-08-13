@@ -157,7 +157,7 @@ class UnipolarDriver(DriverBase):
         if microsteps == HALFSTEP:
             if self._microsteps != HALFSTEP:
                 self._microsteps = microsteps
-                self._current_step *= 2
+                self._current_step = int(self._current_step * 2)
             return True
 
         elif microsteps == FULLSTEP or microsteps == WAVE:
@@ -166,7 +166,7 @@ class UnipolarDriver(DriverBase):
                     return False
                 else:
                     self._microsteps = microsteps
-                    self._current_step /= 2
+                    self._current_step = int(self._current_step/2)
                 return True
             else:  # FULLSTEP or WAVE already
                 return True

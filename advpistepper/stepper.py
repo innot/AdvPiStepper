@@ -293,9 +293,7 @@ class AdvPiStepper(object):
         if speed <= 0.0:
             raise ValueError(f"Speed must be > 0.0, was {speed}")
 
-        cmd = Command(Verb.SPEED, speed)
-        self.c_pipe.send(cmd)
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.SPEED, speed)
 
     @property
     def current_speed(self) -> float:
@@ -344,9 +342,7 @@ class AdvPiStepper(object):
         if rate <= 0.0:
             raise ValueError(f"Acceleration must be greater than 0.0, was {rate}")
 
-        cmd = Command(Verb.ACCELERATION, rate)
-        self.c_pipe.send(cmd)
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.ACCELERATION, rate)
 
     @property
     def deceleration(self):
@@ -377,9 +373,7 @@ class AdvPiStepper(object):
         if rate <= 0.0:
             raise ValueError(f"Deceleration must be greater than 0.0, was {rate}")
 
-        cmd = Command(Verb.DECELARATION, rate)
-        self.c_pipe.send(cmd)
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.DECELARATION, rate)
 
     @property
     def full_steps_per_rev(self) -> int:
@@ -409,9 +403,7 @@ class AdvPiStepper(object):
         if steps < 0:
             raise ValueError("steps must be 2 or greater")
 
-        cmd = Command(Verb.FULL_STEPS_PER_REV, steps)
-        self.c_pipe.send(cmd)
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.FULL_STEPS_PER_REV, steps)
 
     @property
     def microsteps(self) -> int:
@@ -447,8 +439,7 @@ class AdvPiStepper(object):
             raise ValueError(
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
-        self.c_pipe.send(Command(Verb.MICROSTEPS, steps))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.MICROSTEPS, steps)
 
     def move(self, steps: int, speed: float = None, block: bool = False):
         """
@@ -478,10 +469,8 @@ class AdvPiStepper(object):
         if not isinstance(steps, int):
             raise ValueError(f"Argument steps must be an integer, was {type(steps).__name__}")
 
-        self.c_pipe.send(Command(Verb.SPEED, speed))
-        self._wait_for_acknowledge()
-        self.c_pipe.send(Command(Verb.MOVE, steps))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.SPEED, speed)
+        self.send_cmd(Verb.MOVE, steps)
 
         if block:
             self._wait_for_idle()
@@ -519,10 +508,8 @@ class AdvPiStepper(object):
         if speed < 0.0:
             raise ValueError(f"Argument speed must be greater than 0.0, was {speed}")
 
-        self.c_pipe.send(Command(Verb.SPEED, speed))
-        self._wait_for_acknowledge()
-        self.c_pipe.send(Command(Verb.RUN, direction))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.SPEED, speed)
+        self.send_cmd(Verb.RUN, direction)
 
     def stop(self, block: bool = False):
         """
@@ -532,8 +519,7 @@ class AdvPiStepper(object):
                         Default 'False', i.e. call will return immediately.
         :type block:    bool
         """
-        self.c_pipe.send(Command(Verb.STOP))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.STOP)
         if block:
             self._wait_for_idle()
 
@@ -553,8 +539,7 @@ class AdvPiStepper(object):
                         Default 'False', i.e. call will return immediately.
         :type block:    bool
         """
-        self.c_pipe.send(Command(Verb.HARD_STOP))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.HARD_STOP)
         if block:
             self._wait_for_idle()
 
@@ -566,8 +551,7 @@ class AdvPiStepper(object):
         for the given number of steps. But after it has finished the current position
         will be the number of steps performed since the call to zero().
         """
-        self.c_pipe.send(Command(Verb.ZERO))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.ZERO)
 
     def engage(self, block: bool = False):
         """
@@ -580,8 +564,7 @@ class AdvPiStepper(object):
                         Default 'False', i.e. call will return immediately.
         :type block:    bool
         """
-        self.c_pipe.send(Command(Verb.ENGAGE))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.ENGAGE)
         if block:
             self._wait_for_idle()
 
@@ -596,14 +579,12 @@ class AdvPiStepper(object):
 
         Calling this method while a move is underway is similar to a hard stop.
 
-
         :param block:   When 'True' waits for the driver to release.
                         Default 'False', i.e. call will return immediately.
         :type block:    bool
 
         """
-        self.c_pipe.send(Command(Verb.RELEASE))
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.RELEASE)
         if block:
             self._wait_for_idle()
 
@@ -615,15 +596,30 @@ class AdvPiStepper(object):
         This is called automatically when the AdvPiStepper object is garbage collected.
         """
         try:
-            self.c_pipe.send(Command(Verb.QUIT))
-            self._wait_for_acknowledge()
+            self.send_cmd(Verb.QUIT)
             time.sleep(0.1)
             self.c_pipe.close()
             self.r_pipe.close()
             self.process.join()
-        except(EOFError, OSError):
+        except(EOFError, OSError, BrokenPipeError):
             # maybe the object is already closed.
             pass
+
+    def send_cmd(self, verb: Verb, noun: Union[int, float, Noun] = None):
+        """Send a command to the backend and wait until the backend has acknowledged.
+        :param verb: The command to execute
+        :type verb: Verb
+        :param noun: An optional parameter
+        :type noun: Noun
+        :raises EOFError: when the backend does not acknowlege the command.
+        """
+        cmd = Command(verb, noun)
+        self.c_pipe.send(cmd)
+        ack = self.c_pipe.poll(3.0)  # 3 seconds is rather long but required when accessing a remote Pi.
+        if ack:
+            self.c_pipe.recv()
+        else:
+            raise EOFError("Command not acknowledged after 3 second. Maxbe backend down?")
 
     def _get_value(self, noun: Noun) -> Union[int, float, bool]:
         """Retrieve the given parameter from the stepper process.
@@ -636,9 +632,7 @@ class AdvPiStepper(object):
         :return: The requested value.
         :rtype: object"""
 
-        cmd = Command(Verb.GET, noun)
-        self.c_pipe.send(cmd)
-        self._wait_for_acknowledge()
+        self.send_cmd(Verb.GET, noun)
         self.r_pipe.poll(1)  # if no result after 1 second then the other Process is stuck
         result = self.r_pipe.recv()
         if result.noun != noun:
@@ -649,13 +643,6 @@ class AdvPiStepper(object):
 
     def _wait_for_idle(self):
         result = self.idle_event.wait()
-
-    def _wait_for_acknowledge(self):
-        ack = self.c_pipe.poll(3.0)
-        if ack:
-            result = self.c_pipe.recv()
-        else:
-            raise EOFError("Command not acknowledged after 3 second. Maxbe backend down?")
 
 
 class StepperProcess(multiprocessing.Process):
@@ -842,6 +829,8 @@ class StepperProcess(multiprocessing.Process):
 
         self.microstep_change_at = None
 
+        self.driver.set_microsteps(self.microsteps)
+
     def move(self, relative):
         if self.target_position == float('inf') or self.target_position == float('-inf'):
             # when in continuous mode we can only reference the current position
@@ -1023,8 +1012,6 @@ class StepperProcess(multiprocessing.Process):
         self.init_move()
 
         self.pi.wave_clear()
-        next_wave_id = -1
-        current_wave_id = -1
         prev_wave_id = -1
 
         # start of with a minimal delay pulse just so that we have a

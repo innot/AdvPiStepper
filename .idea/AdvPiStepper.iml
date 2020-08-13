@@ -4,6 +4,10 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/advpistepper" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/AdvPiStepper.egg-info" />
+      <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/pigpio" />
       <excludeFolder url="file://$MODULE_DIR$/sandbox" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />

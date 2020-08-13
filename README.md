@@ -25,7 +25,7 @@ in any shape or form.
 
 ## Requirements
 AdvPiStepper uses the [pigpio](http://abyz.me.uk/rpi/pigpio/) library to access the Raspberry Pi GPIO pins.
-It requires at least V76 of the library, which at the time of writing has not yet been uploaded to the PyPI archive and
+It requires at least V76 of the library, which at the time of writing has not yet been uploaded to the PyPI  and
 therefore has to be [installed manually](http://abyz.me.uk/rpi/pigpio/download.html).
 
 ## Usage
