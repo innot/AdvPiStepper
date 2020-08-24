@@ -11,13 +11,14 @@ import sys
 import unittest
 import multiprocessing
 
-from advpistepper import *
+from advpistepper.driver_base import DriverBase
+from advpistepper.stepper import *
 
 
 class TestStepperProcess(unittest.TestCase):
     c_pipe = None
     r_pipe = None
-    idle_event = None
+    run_lock = None
     process = None
 
     def setUp(self):
@@ -26,9 +27,9 @@ class TestStepperProcess(unittest.TestCase):
 
         c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
         self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
-        self.idle_event = multiprocessing.Event()
+        self.run_lock = multiprocessing.Lock()
 
-        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.idle_event, driver)
+        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.run_lock, driver)
 
     def test_speed(self):
         print("Test Command SPEED")
@@ -418,20 +419,16 @@ class TestStepperProcess(unittest.TestCase):
         self.process.move_deg(-360)
         self.assertEqual(-4096, self.process.target_position)
 
-    def test_idle_event(self):
-        print("Test idle_event")
-        self.idle_event.clear()  # Ensure default behaviour
+    def test_run_lock(self):
+        print("Test run_lock")
         self.process.start()
-        self.idle_event.wait(2)  # two seconds should suffice for the backend to enter the idle loop
 
         self.c_pipe.send(Command(Verb.MOVETO, 10))
-        t0 = time.time()
-        while self.idle_event.is_set():  # wait for the move to start
-            if (time.time() - t0) > 1:  # fail if the move does not start within one second
-                self.fail("Move did not cause idle event to be cleared")
-
-        self.idle_event.wait(2)  # wait not more than two seconds for the move to finish
-        self.assertTrue(self.idle_event.is_set())  # OK only if not timed out
+        self.c_pipe.recv()  # wait for the command to be acknowledged
+        self.assertFalse(self.run_lock.acquire(block=False))
+        # move should be finished after 1 second the the lock released
+        self.assertTrue(self.run_lock.acquire(timeout=1.0))
+        self.run_lock.release()
 
         self.c_pipe.send(Command(Verb.QUIT, 0))
         self.process.join()

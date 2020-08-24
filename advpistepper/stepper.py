@@ -85,8 +85,8 @@ class ControllerData:
     delay: int = 0
     """int: delay until the next step in microseconds."""
 
-    target_speed: float = 0.0
-    """Target speed in steps per second."""
+    target_speed: float = 100
+    """Target speed in steps per second. Default is 100 steps per second."""
 
     speed: float = 0.0
     """Current speed in steps per second."""
@@ -140,6 +140,9 @@ class Verb(Enum):
     # Do nothing operator. Used for setting up the Pipe
     NOP = auto()
 
+    # Acknowledge the command
+    ACKNOWLEDGE = auto()
+
 
 class Noun(Enum):
     """List of values that can be queried with the GET Verb."""
@@ -151,6 +154,7 @@ class Noun(Enum):
     VAL_DECELERATION = auto()
     VAL_FULL_STEPS_PER_REV = auto()
     VAL_MICROSTEPS = auto()
+    VAL_ACKNOWLEDGE = auto()
 
     # Microstep return values
     MICROSTEP_NOT_POSSIBLE = auto()
@@ -215,12 +219,13 @@ class AdvPiStepper(object):
         # setup and start the background process.
         c_pipe_remote, self.c_pipe = multiprocessing.Pipe()
         self.r_pipe, r_pipe_remote = multiprocessing.Pipe()
-        self.idle_event = multiprocessing.Event()
+        self.run_lock = multiprocessing.Lock()
 
-        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.idle_event, driver, params)
+        self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.run_lock, driver, params)
 
         self.process.start()
-        self.c_pipe.send(Command(Verb.NOP, 0))  # Just to get the pipe opened and ready for action
+        self.send_cmd(Verb.NOP, None)  # Wait for the Process to be ready
+        self._wait_for_idle()
 
         self.parameters = params  # keep the current parameters for reference
 
@@ -464,7 +469,7 @@ class AdvPiStepper(object):
                 """
         if speed is None:
             speed = self.target_speed
-        if speed < 0:
+        if speed <= 0:
             raise ValueError(f"Argument speed must be > 0.0, was {speed}")
         if not isinstance(steps, int):
             raise ValueError(f"Argument steps must be an integer, was {type(steps).__name__}")
@@ -644,15 +649,16 @@ class AdvPiStepper(object):
             return result.value
 
     def _wait_for_idle(self):
-        print("Waiting for idle")
-        result = self.idle_event.wait()
-        print("Idle received")
+        print(f"Waiting for idle @time {time.time()}")
+        self.run_lock.acquire()
+        self.run_lock.release()
+        print(f"Idle received @time {time.time()}")
 
 
 class StepperProcess(multiprocessing.Process):
 
     def __init__(self, command_pipe: multiprocessing.Pipe, results_pipe: multiprocessing.Pipe,
-                 idle_event: multiprocessing.Event,
+                 run_lock,
                  driver: DriverBase = None,  parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
@@ -663,7 +669,7 @@ class StepperProcess(multiprocessing.Process):
         # store the arguments
         self.c_pipe = command_pipe
         self.r_pipe = results_pipe
-        self.idle_event = idle_event
+        self.run_lock = run_lock
         self.driver = driver
 
         # set up the internal data
@@ -763,7 +769,7 @@ class StepperProcess(multiprocessing.Process):
             raise RuntimeError(f"Received unknown command {command}")
 
         # Acknowledge to the frontend that the command has been received and processed.
-        self.c_pipe.send(Result(Noun.VAL_TARGET_POSITION, self.target_position))
+        self.c_pipe.send(Result(Noun.VAL_ACKNOWLEDGE, verb))
 
     def set_speed(self, speed):
         old_speed = self.cd.target_speed
@@ -779,7 +785,7 @@ class StepperProcess(multiprocessing.Process):
             self.cd.step = int((speed * speed) / (2.0 * self.acceleration))
             self.cd.state = INC
         elif speed < old_speed and (self.cd.state == RUN or self.cd.state == INC):
-            # see above, with negativ sign to cause a deceleration
+            # see above, with negative sign to cause a deceleration
             self.cd.step = int(-(speed * speed) / (2.0 * self.deceleration))
             self.cd.state = DEC
 
@@ -985,16 +991,15 @@ class StepperProcess(multiprocessing.Process):
 
         try:
             while not self.quit_now:
-                self.idle_event.set()  # Tell the world that we are twiddeling our thumbs
                 pipedata = self.c_pipe.poll(0.1)  # Wait for command
                 if pipedata:
-                    self.idle_event.clear()
-                    print("Idle flag cleared")
+                    self.run_lock.acquire() # Tell the world we are busy...
                     command = self.c_pipe.recv()
                     self.command_handler(command)
                     if self.move_required:
                         self.busy_loop()
                         self.move_required = False
+                    self.run_lock.release()  # ... and that we are twiddeling our thumbs again
         except EOFError:
             # the other end has closed the pipe.
             # clean up and go home
@@ -1145,6 +1150,6 @@ class StepperProcess(multiprocessing.Process):
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
- #       print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
+        print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
 
         return int(data.c_n)
