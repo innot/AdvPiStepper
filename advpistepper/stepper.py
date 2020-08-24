@@ -445,6 +445,12 @@ class AdvPiStepper(object):
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
         self.send_cmd(Verb.MICROSTEPS, steps)
+        ready = self.r_pipe.poll(1.0)    # Should not time out - just in case
+        if ready:
+            retval = self.r_pipe.recv()
+            print(f"microstep change returned:{retval}")
+        else:
+            raise EOFError("Microstep change timed out. Maybe backend down?")
 
     def move(self, steps: int, speed: float = None, block: bool = False):
         """
@@ -810,7 +816,7 @@ class StepperProcess(multiprocessing.Process):
         c_steps = self.driver.steps_until_change_microsteps(steps)
         if c_steps < 0:
             # microstep setting not possible
-            self.c_pipe.send(Result(Noun.MICROSTEP_NOT_POSSIBLE, 0))
+            self.r_pipe.send(Result(Noun.MICROSTEP_NOT_POSSIBLE, 0))
             return
 
         self.microstep_new_value = steps
@@ -823,7 +829,7 @@ class StepperProcess(multiprocessing.Process):
             self.microstep_change_at = change_pos
             self.microstep_new_value = steps
 
-        self.c_pipe.send(Result(Noun.MICROSTEP_CHANGE_AT, change_pos))
+        self.r_pipe.send(Result(Noun.MICROSTEP_CHANGE_AT, change_pos))
 
     def _perform_microstep_change(self):
         previous = self.microsteps
@@ -1150,6 +1156,6 @@ class StepperProcess(multiprocessing.Process):
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
-        print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
+ #       print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
 
         return int(data.c_n)

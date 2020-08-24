@@ -31,7 +31,7 @@ def main(argv):
 
     stepper.microsteps = 1
 
-    stepper.move(200, 100, block=True)
+    stepper.move(500, 2000, block=True)
 
 #    stepper.target_speed = 1000
 #    stepper.run(1)
