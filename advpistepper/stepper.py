@@ -614,12 +614,14 @@ class AdvPiStepper(object):
         :raises EOFError: when the backend does not acknowlege the command.
         """
         cmd = Command(verb, noun)
+#        print(f"send command {cmd}")
         self.c_pipe.send(cmd)
         ack = self.c_pipe.poll(3.0)  # 3 seconds is rather long but required when accessing a remote Pi.
         if ack:
-            self.c_pipe.recv()
+            retval = self.c_pipe.recv()
+            print(f"retval for cmd {cmd}:{retval}")
         else:
-            raise EOFError("Command not acknowledged after 3 second. Maxbe backend down?")
+            raise EOFError("Command not acknowledged after 3 second. Maybe backend down?")
 
     def _get_value(self, noun: Noun) -> Union[int, float, bool]:
         """Retrieve the given parameter from the stepper process.
@@ -642,14 +644,16 @@ class AdvPiStepper(object):
             return result.value
 
     def _wait_for_idle(self):
+        print("Waiting for idle")
         result = self.idle_event.wait()
+        print("Idle received")
 
 
 class StepperProcess(multiprocessing.Process):
 
     def __init__(self, command_pipe: multiprocessing.Pipe, results_pipe: multiprocessing.Pipe,
-                 idle_event: multiprocessing.Event, driver: DriverBase = None,
-                 parameters: Dict[str, Any] = None):
+                 idle_event: multiprocessing.Event,
+                 driver: DriverBase = None,  parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
         self.params: Dict[str, Any] = driver.parameters  # default values
@@ -985,6 +989,7 @@ class StepperProcess(multiprocessing.Process):
                 pipedata = self.c_pipe.poll(0.1)  # Wait for command
                 if pipedata:
                     self.idle_event.clear()
+                    print("Idle flag cleared")
                     command = self.c_pipe.recv()
                     self.command_handler(command)
                     if self.move_required:
@@ -1140,6 +1145,6 @@ class StepperProcess(multiprocessing.Process):
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
-        print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
+ #       print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
 
         return int(data.c_n)

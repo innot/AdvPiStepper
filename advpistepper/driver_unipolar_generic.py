@@ -148,6 +148,8 @@ class UnipolarDriver(DriverBase):
             level = step[i]
             self._pi.write(pin, level)
 
+        self._pi.write(17,0)
+
     def release(self):
         """Deenergize all coils."""
         for pin in self._gpio_pins:
@@ -191,6 +193,12 @@ class UnipolarDriver(DriverBase):
         self._current_direction = direction
 
     def perform_step(self, delay: int) -> list:
+        """Generate the pigpio wave list for a single step.
+
+        The generated wave starts with the given delay and then sets the GPIOs
+        for the step.
+        """
+        self._pi.write(17, 1)
 
         direction = self._current_direction
 
@@ -199,7 +207,10 @@ class UnipolarDriver(DriverBase):
         next_seq = self._sequences[self._microsteps][next_step]
         self._current_step = next_step
 
-        wave = []
+        # start with a delay, because a move starts with a call to engage() which sets the
+        # GPIOs to the current step
+        wave = [pigpio.pulse(0, 0, delay)]
+
         for i in range(0, len(curr_seq)):
             if curr_seq[i] == next_seq[i]:
                 continue
@@ -214,8 +225,7 @@ class UnipolarDriver(DriverBase):
                 pin_on = self._gpio_pins_masks[i]
                 wave.append(pigpio.pulse(pin_on, 0, 0))
 
-        wave.append(pigpio.pulse(0, 0, delay))
-
         #        print(f"seq[{next_step}] = {next_seq} @ {t.perf_counter_ns()}")
+        self._pi.write(17, 0)
 
         return wave
