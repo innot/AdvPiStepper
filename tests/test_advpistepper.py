@@ -9,14 +9,14 @@
 #
 import unittest
 
-import advpistepper as stepper
+import advpistepper as apis
 
 
 class MyTestCase(unittest.TestCase):
     apis = None
 
     def setUp(self):
-        self.apis = stepper.AdvPiStepper()
+        self.apis = apis.AdvPiStepper()
 
     def tearDown(self) -> None:
         self.apis.close()
@@ -34,7 +34,7 @@ class MyTestCase(unittest.TestCase):
             self.apis.target_speed = -1
 
         # test speed change during a run
-        self.apis.run(stepper.CW, 1000)
+        self.apis.run(apis.CW, 1000)
         self.assertEqual(1000, self.apis.target_speed)
         self.apis.stop()
         print("test target_speed completed")
@@ -67,8 +67,8 @@ class MyTestCase(unittest.TestCase):
         self.apis.close()
         self.assertFalse(self.apis.process.is_alive())
 
-        apis = stepper.AdvPiStepper()
-        del apis  # should not throw any errors.
+        obj = apis.AdvPiStepper()
+        del obj  # should not throw any errors.
         print("test close completed")
 
 

@@ -9,10 +9,7 @@
 
 import sys
 import unittest
-import multiprocessing
-
-from advpistepper.driver_base import DriverBase
-from advpistepper.stepper import *
+from advpistepper.stepper_process import *
 
 
 class TestStepperProcess(unittest.TestCase):
