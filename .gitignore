@@ -1,3 +1,5 @@
 /dist/
 /AdvPiStepper.egg-info/
 /build/
+/docs/build/
+/pigpio/

@@ -9,8 +9,8 @@ from advpistepper.driver_unipolar_generic import *
 
 class Driver28BYJ48(UnipolarDriver):
     """
-    Driver for the popular 28BYJ48 stepper motor.
-    The 28BYJ48 is a small, 5V or 12V stepper motor with an integrated reduction gear which
+    Driver for the popular 28BYJ-48 stepper motor.
+    The 28BYJ-48 is a small, 5V or 12V stepper motor with an integrated reduction gear which
     results in 2048 full steps per revolution of the output shaft. Due to the high
     reduction gear (64:1), this stepper motor is rather slow
     Without any hacks (e.g. higher voltage; bipolar mods) and without much load
@@ -20,7 +20,7 @@ class Driver28BYJ48(UnipolarDriver):
     based on the ULN2003 Darlington array for less than 3€.
 
     This driver just defines the following parameters for this motor, guessed from this
-    _datasheet: https://www.digikey.de/de/datasheets/mikroelektronika-step-motor-5v-28byj48-datasheet
+    `datasheet <https://www.digikey.de/de/datasheets/mikroelektronika/mikroelektronika-step-motor-5v-28byj48-datasheet>`
     with the help of the _stepper motor glossary: https://www.anaheimautomation.com/support/stepper_motor_glossary.htm
 
     There are numerous variants of the 28BYJ48 on the market with slightly different parameters, so

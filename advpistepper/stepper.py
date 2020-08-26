@@ -287,7 +287,7 @@ class AdvPiStepper(object):
         Set the target speed.
 
         This is the speed the controller will
-        accelerate to and maintain once reached. The speed is 
+        accelerate to and maintain once reached. The speed is
         independent from the direction, therefore the speed must be
         greater than 0.
 
@@ -437,7 +437,11 @@ class AdvPiStepper(object):
         absolute speed will be unchanged, i.e. the target speed (in steps per
         second) will be scaled by new_microsteps / old_microsteps.
 
-        :param steps: 
+        :param steps: Requested number of microsteps per full step.
+        :type steps: int
+        :returns: position at which the change in microsteps has occured or will occure.
+        :rtype: int
+        :raises ValueError: if the requested microsteps are not supported by the driver.
         """
         if steps not in self.parameters[MICROSTEP_OPTIONS]:
             print(self.parameters)
@@ -845,7 +849,7 @@ class StepperProcess(multiprocessing.Process):
 
         self.microstep_change_at = None
 
-        self.driver.set_microsteps(self.microsteps)
+        self.driver.microsteps = self.microsteps
 
     def move(self, relative):
         if self.target_position == float('inf') or self.target_position == float('-inf'):

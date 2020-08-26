@@ -24,6 +24,7 @@ The Keys which are used as parameters to describe a motor and the driver.
 * MICROSTEP_DEFAULT:    The prefered microstep rate of the driver.
 
 Other parameters which can be passed to the AdvPiStepper class
+
 * PIGPIO_ADDR:  The hostname of the system where the pigpio daemon is running on.
 * PIGPIO_PORT:  The port on which the pigpio daemon is listening on.
 

@@ -1,8 +1,13 @@
-"""
-Created on 15.06.2020
+#  Copyright (c) 2020 Thomas Holland (thomas@innot.de)
+#  All rights reserved.
+#
+#  This code is licensed under the MIT License.
+#
+#  Refer to the LICENSE file which is part of the AdvPiStepper distribution or
+#  to https://opensource.org/licenses/MIT for a text of the license.
+#
+#
 
-@author: thoma
-"""
 
 from typing import Dict, Any, Tuple
 
@@ -12,6 +17,13 @@ from advpistepper.common import *
 
 
 class DriverBase(object):
+    """The base class for all stepper drivers.
+    This class should be subclassed for specfic drivers.
+
+    At a minimum a driver should override :meth:`perform_step`
+    to generate the gpio pulses. All other methods can be overridden as required.
+    """
+
     db_defaults: Dict[str, Any] = {
         MAX_SPEED: 1000.0,
         MAX_TORQUE_SPEED: 100.0,
@@ -135,39 +147,29 @@ class DriverBase(object):
 
     @property
     def direction(self) -> int:
-        """Get the current direction of rotation.
-        :returns: Clockwise (CW / 1) or counterclockwise (CCW / -1)
-        :rtype: int
+        """The current direction of the motor.
+        Can be either clockwise (CW / 1) or counterclockwise (CCW / -1).
+        When changed all subsequent calls to perform_step() will go in
+        the given direction.
+        It is up to the caller to ensure that the motor is able to change
+        the direction of rotation, i.e. has come to a complete stop.
         """
         return self._direction
 
     @direction.setter
     def direction(self, direction: int):
-        """Set the direction of rotation.
-        All subsequent calls to perform_step() will cause a rotation in
-        the given direction.
-        It is up to the caller to ensure that the motor is able to change
-        the direction of rotation, i.e. has come to a complete stop.
-
-        :param direction: Clockwise (CW / 1) or counterclockwise(CCW / -1).
-        :type direction: int
-        """
         self._direction = direction
 
     @property
     def microsteps(self) -> int:
-        """Get the currently set number of microsteps.
-        :returns: Microsteps per full step.
-        :rtype: int"""
+        """The currently set number of microsteps.
+        This method will only be successful if the driver is ready for a change in
+        microsteps, which can be checked with :meth:`steps_until_change_microsteps` method.
+        """
         return self._microsteps
 
-    def set_microsteps(self, steps: int) -> bool:
-        """Set the number of microsteps to use.
-        This method will only be successful if the driver is ready for a change in
-        microsteps, which can be checked with the steps_until_change_microsteps() method.
-        :returns: True if the change was successful, False if not.
-        :rtype: bool
-        """
+    @microsteps.setter
+    def microsteps(self, steps: int) -> bool:
         self._microsteps = steps  # should be overridden by subclasses
         return True
 
@@ -179,9 +181,10 @@ class DriverBase(object):
         full step first). A negative return value means that the driver can not change
         to the new value, either because it is not supported or the change can only be
         made when the motor is not running.
+
         :returns:   number of steps before microsteps value can be changed.
-                    0 if change is possible right now.
-                    negative if the requested microsteps can not be set at the moment.
+            0 if change is possible right now.
+            negative if the requested microsteps can not be set at the moment.
         :rtype: int
         """
         return 0  # should be overriden in the subclasses.
