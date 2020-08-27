@@ -189,3 +189,6 @@ epub_exclude_files = ['search.html']
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+# Autodoc options
+autodoc_member_order = 'bysource'

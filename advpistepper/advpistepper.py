@@ -244,18 +244,8 @@ class AdvPiStepper(object):
     @property
     def microsteps(self) -> int:
         """
-        Get the currently set number of microsteps per full step.
+        Number of microsteps per full step.
 
-        :returns: number betwenn 1 and the max supported number of microsteps.
-        :rtype: int"""
-
-        result = self._get_value(Noun.VAL_MICROSTEPS)
-        return result
-
-    @microsteps.setter
-    def microsteps(self, steps: int):
-        """
-        Set the number of microsteps per full step.
         The number must be from the list of supported MICROSTEP_OPTIONS.
         Changing microsteps while the stepper motor is running may or may
         not work - depending on the driver. Refer to the driver documentation
@@ -264,9 +254,21 @@ class AdvPiStepper(object):
         the microstep setting. Therefore the change may happen at some
         point in the future without any guarantee about the exact step.
 
-        If the microstep setting is changed while the motor is running the
-        absolute speed will be unchanged, i.e. the target speed (in steps per
-        second) will be scaled by new_microsteps / old_microsteps.
+        .. note::
+
+            If the microstep setting is changed while the motor is running the
+            absolute speed will be unchanged, i.e. the target speed (in steps per
+            second) will be scaled by new_microsteps / old_microsteps.
+
+        :type: int
+        """
+        result = self._get_value(Noun.VAL_MICROSTEPS)
+        return result
+
+    @microsteps.setter
+    def microsteps(self, steps: int):
+        """
+        Set the number of microsteps per full step.
 
         :param steps: Requested number of microsteps per full step.
         :type steps: int
