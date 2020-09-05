@@ -5,10 +5,9 @@ AdvPiStepper Documentation
 The ``AdvPiStepper`` Class
 --------------------------
 
-.. automodule:: advpistepper.advpistepper
+.. automodule:: advpistepper.stepper
     :members:
     :undoc-members:
-    :show-inheritance:
 
 advpistepper.common module
 --------------------------
@@ -16,7 +15,6 @@ advpistepper.common module
 .. automodule:: advpistepper.common
     :members:
     :undoc-members:
-    :show-inheritance:
 
 advpistepper.driver\_base module
 --------------------------------
@@ -24,7 +22,6 @@ advpistepper.driver\_base module
 .. automodule:: advpistepper.driver_base
     :members:
     :undoc-members:
-    :show-inheritance:
 
 advpistepper.driver\_unipolar\_28byj48 module
 ---------------------------------------------
