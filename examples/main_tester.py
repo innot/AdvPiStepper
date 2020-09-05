@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 '''
 Created on 11.06.2020
 
@@ -31,12 +32,12 @@ def main(argv):
 
     stepper.microsteps = 1
 
-    stepper.move(500, 2000, block=True)
+#    stepper.move(500, 2000, block=True)
 
-#    stepper.target_speed = 1000
-#    stepper.run(1)
-#    time.sleep(0.5)
-#    stepper.stop(True)
+    stepper.target_speed = 1700
+    stepper.run(1)
+    time.sleep(5)
+    stepper.stop(True)
 
     time.sleep(0.1)
     stepper.release()

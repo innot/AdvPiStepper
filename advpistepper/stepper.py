@@ -8,35 +8,33 @@
 #
 #
 
-""" Stepper Driver"""
+"""The :class:`AdvPiStepper` class is the main interface"""
 
 import time
 import multiprocessing
 from typing import Dict, Any, Union
 
 # local imports
-from .common import *
-from .driver_base import DriverBase
-from .stepper_process import StepperProcess, Verb, Noun, Command
+from advpistepper.common import MICROSTEP_OPTIONS, CW, CCW
+from advpistepper.driver_base import DriverBase
+from advpistepper.stepper_process import StepperProcess, Verb, Noun, Command
 
 
 class AdvPiStepper(object):
     """
-    classdocs
+    :param driver:
+        The GPIO driver used to translate steps to pigpio pulses
+        and waves. The stepper may contain some optional info
+        about the actual stepper motor (max. speed etc.).
+        Defaults to a dummy driver (no actual gpio).
+    :type driver: DriverBase
+    :param parameters:
+        Optinal list of parameters to override default values.
+        Refer to `parameters` for more details
+    :type parameters: Dict[str,Any]
     """
 
     def __init__(self, driver=None, parameters: Dict[str, Any] = None):
-        """
-        :param driver:
-            The GPIO driver used to translate steps to pigpio pulses
-            and waves. The stepper may contain some optional info
-            about the actual stepper motor (max. speed etc.)
-            Defaults to a debug stepper (no actual gpio).
-        :type driver: DriverBase
-        :param parameters:
-            Optinal list of parameters to override default values.
-        :type parameters: Dict[str,Any]
-        """
 
         if driver is None:
             driver = DriverBase()
@@ -68,7 +66,7 @@ class AdvPiStepper(object):
     @property
     def current_position(self) -> int:
         """
-        Get the current position of the motor.
+        The current position of the motor.
 
         The position will be in steps or microsteps from the origin.
 
@@ -77,8 +75,7 @@ class AdvPiStepper(object):
 
         This property is read-only.
 
-        :returns: the current motor position in steps / microsteps.
-        :rtype: int
+        :type: int
         """
         result = int(self._get_value(Noun.VAL_CURRENT_POSITION))
         return result
@@ -86,14 +83,13 @@ class AdvPiStepper(object):
     @property
     def target_position(self) -> int:
         """
-        Get the current target position of the driver.
+        The current target position of the driver.
 
         This is the position the stepper driver is currently moving to.
 
         This property is read-only.
 
-        :return: the target position in steps / microsteps from origin.
-        :rtype: int
+        :type: int
         """
         result = int(self._get_value(Noun.VAL_TARGET_POSITION))
         return result
@@ -101,31 +97,18 @@ class AdvPiStepper(object):
     @property
     def target_speed(self) -> float:
         """
-        Get the selected target speed.
+        The selected target speed in steps or microsteps per second.
 
-        During acceleration / deceleration
-        the actual speed may be less than the target speed.
-
-        :return: The speed in steps or microsteps per second
-        :rtype: float
+        This is the speed the stepper will accelerate to and maintain during moves.
+        It is independant of the direction and must be greater than 0.
+        Setting a target speed of 0 or less will cause a `ValueError` exception.
+        :type: float
         """
         result = float(self._get_value(Noun.VAL_TARGET_SPEED))
         return result
 
     @target_speed.setter
     def target_speed(self, speed: float):
-        """
-        Set the target speed.
-
-        This is the speed the controller will
-        accelerate to and maintain once reached. The speed is
-        independent from the direction, therefore the speed must be
-        greater than 0.
-
-        :param speed: target speed in steps/microsteps per second.
-        :type speed: float
-        :raises ValueError: When the given speed is 0 or less.
-        """
         if speed <= 0.0:
             raise ValueError(f"Speed must be > 0.0, was {speed}")
 
@@ -134,17 +117,15 @@ class AdvPiStepper(object):
     @property
     def current_speed(self) -> float:
         """
-        Get the current speed.
+        The current speed in steps or microsteps per second.
 
         During acceleration / deceleration the current speed will be
-        less than the target speed. Also during accel/decels and due
-        to the asynchronous nature of AdvPiStepper the returned value
-        might be a microseconds old and therefore not accurate.
+        less than the target speed. Due to the asynchronous nature of
+        AdvPiStepper the returned value might lag the actual speed.
 
         This property is read-only.
 
-        :return: The speed in steps or microsteps per second
-        :rtype: float
+        :type: float
         """
         result = self._get_value(Noun.VAL_CURRENT_SPEED)
         return float(result)
@@ -152,29 +133,24 @@ class AdvPiStepper(object):
     @property
     def acceleration(self) -> float:
         """
-        Get the current acceleration rate.
+        The current acceleration rate in steps / microsteps per second :sup:`2`
 
-        :return: The set acceleration in steps per second squared.
-        :rtype: float
+        This property will override any default acceleration rate
+        set by the driver. Any changes to this rate will be applied
+        immediately and will affect any ongoing acceleration.
+
+        High values may cause lost steps and motor stalls.
+
+        The value must be greater than zero. Trying to set a value of 0 or less will
+        cause a `ValueError` exception.
+
+        :type: float
         """
         result = self._get_value(Noun.VAL_ACCELERATION)
         return float(result)
 
     @acceleration.setter
     def acceleration(self, rate: float):
-        """
-        Sets the desired acceleration in steps per second squared.
-
-        High values may cause lost steps and stalled motors
-
-        This property will override any default acceleration rate
-        set by the driver. Any changes to this rate will be applied
-        immediately and will affect any ongoing acceleration.
-
-        :param rate: Must be greater than 0.
-        :type rate: float
-        :raises ValueError: if the rate is not valid.
-        """
         if rate <= 0.0:
             raise ValueError(f"Acceleration must be greater than 0.0, was {rate}")
 
@@ -183,29 +159,24 @@ class AdvPiStepper(object):
     @property
     def deceleration(self):
         """
-        Get the current deceleration rate.
+        The current deceleration rate in steps / microsteps per second :sup:`2`
 
-        :return: The set deceleration in steps per second squared.
-        :rtype: float
+        This property will override any default deceleration rate
+        set by the driver. Any changes to this rate will be applied
+        immediately and will affect any ongoing deceleration.
+
+        High values may cause lost steps due to motor inertia.
+
+        The value must be greater than zero. Trying to set a value of 0 or less will
+        cause a `ValueError` exception.
+
+        :type: float
         """
         result = self._get_value(Noun.VAL_DECELERATION)
         return float(result)
 
     @deceleration.setter
     def deceleration(self, rate: float):
-        """Sets the desired deceleration in steps per second squared.
-
-        High values may cause lost steps due to motor inertia.
-
-        This property will override any default deceleration rate
-        set by the driver. Any changes to this rate will be applied
-        immediately and will affect any ongoing deceleration.
-
-        :param rate: Must be greater than 0.
-        :type rate: float
-        :raises ValueError: if the rate is not valid.
-        """
-
         if rate <= 0.0:
             raise ValueError(f"Deceleration must be greater than 0.0, was {rate}")
 
@@ -214,28 +185,23 @@ class AdvPiStepper(object):
     @property
     def full_steps_per_rev(self) -> int:
         """
-        Get the number of full steps for a single revolution of the stepper motor.
-
-        :returns: number of steps. 0 if not defined.
-        :rtype: int
-        """
-        result = self._get_value(Noun.VAL_FULL_STEPS_PER_REV)
-        return result
-
-    @full_steps_per_rev.setter
-    def full_steps_per_rev(self, steps: int):
-        """
-        Set the number of full steps for one complete revolution.
+        The number of full steps for one complete revolution of the motor.
 
         Overrides any default value that may have been set by the driver.
 
         Is applied immediately and will effect any succeding
         move_deg() or moveto_deg() calls.
 
-        :param steps: number of steps. May be 0 to indicate an undefined value.
-        :type steps: int
-        :raises ValueError: If the argument is not an integer 0 or greater.
+        The value must be 2 or greater. Trying to set a value less of 1 or less will
+        cause a `ValueError` exception.
+
+        :type: int
         """
+        result = self._get_value(Noun.VAL_FULL_STEPS_PER_REV)
+        return result
+
+    @full_steps_per_rev.setter
+    def full_steps_per_rev(self, steps: int):
         if steps < 0:
             raise ValueError("steps must be 2 or greater")
 
@@ -255,10 +221,12 @@ class AdvPiStepper(object):
         point in the future without any guarantee about the exact step.
 
         .. note::
-
             If the microstep setting is changed while the motor is running the
             absolute speed will be unchanged, i.e. the target speed (in steps per
             second) will be scaled by new_microsteps / old_microsteps.
+
+        Trying to set a value that is not supported by the driver will cause a
+        `ValueError`exception.
 
         :type: int
         """
@@ -267,15 +235,6 @@ class AdvPiStepper(object):
 
     @microsteps.setter
     def microsteps(self, steps: int):
-        """
-        Set the number of microsteps per full step.
-
-        :param steps: Requested number of microsteps per full step.
-        :type steps: int
-        :returns: position at which the change in microsteps has occured or will occure.
-        :rtype: int
-        :raises ValueError: if the requested microsteps are not supported by the driver.
-        """
         if steps not in self.parameters[MICROSTEP_OPTIONS]:
             print(self.parameters)
             raise ValueError(
@@ -310,27 +269,49 @@ class AdvPiStepper(object):
         :type block:    bool
         :raises ValueError: if the speed is 0 or less.
                 """
-        if speed is None:
-            speed = self.target_speed
-        if speed <= 0:
-            raise ValueError(f"Argument speed must be > 0.0, was {speed}")
         if not isinstance(steps, int):
             raise ValueError(f"Argument steps must be an integer, was {type(steps).__name__}")
 
-        self.send_cmd(Verb.SPEED, speed)
+        if speed is not None:
+            if speed <= 0.0:
+                raise ValueError(f"Argument speed must be > 0.0, was {speed}")
+            self.send_cmd(Verb.SPEED, speed)
+
         self.send_cmd(Verb.MOVE, steps)
 
         if block:
             self._wait_for_idle()
 
-    def move_to(self, absolut):
+    def move_to(self, position: int, speed: float=None, block: bool=False):
         """
-        Move to the given location.
+        Move to the given absolute location.
 
-        Use set_zero() to define the origin.
-        This function blocks until all steps have been performed.
+        Location is in steps or microsteps from the origin, which is the position set by :meth:`zero`
+        (or the position at initialization) and can be negative.
+        This can be called while a move is underway.
+
+        :param position:    Target position in steps or microsteps.
+        :type position: int
+        :param speed:   Target speed in steps or microsteps per second.
+                        Must be >0. Optional, default is the most recent target speed.
+        :type speed: float
+        :param block:   When 'True' waits for the move to complete.
+                        Default 'False', i.e. call will return immediately.
+        :type block:    bool
+        :raises ValueError: if the speed is 0 or less.
         """
-        pass
+        if not isinstance(position, int):
+            raise ValueError(f"Argument position must be an integer, was {type(position).__name__}")
+
+        if speed is not None:
+            if speed <= 0.0:
+                raise ValueError(f"Argument speed must be > 0.0, was {speed}")
+            self.send_cmd(Verb.SPEED, speed)
+
+        self.send_cmd(Verb.MOVETO, position)
+
+        if block:
+            self._wait_for_idle()
 
     def run(self, direction: int, speed: float = 0.0):
         """

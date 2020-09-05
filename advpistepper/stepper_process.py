@@ -11,6 +11,7 @@
 """ Stepper Driver"""
 
 import time
+import os
 import multiprocessing
 import pigpio
 
@@ -193,7 +194,7 @@ class StepperProcess(multiprocessing.Process):
 
     def __init__(self, command_pipe: multiprocessing.Pipe, results_pipe: multiprocessing.Pipe,
                  run_lock,
-                 driver: DriverBase = None,  parameters: Dict[str, Any] = None):
+                 driver: DriverBase = None, parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
         self.params: Dict[str, Any] = driver.parameters  # default values
@@ -236,6 +237,13 @@ class StepperProcess(multiprocessing.Process):
         # do not connect to pigpio yet as pigpio uses a lock which can not be
         # pickeled and therefore not be spawned / forked.
         self.pi = None
+
+        # if running on Linux (Raspberry Pi) try to get a higher priority.
+        # This works only if this is run with root privileges.
+        try:
+            os.nice(-10)
+        except (PermissionError, AttributeError):
+            pass
 
     def run(self):
         # connect to pigpio once we have started as a process.
@@ -553,6 +561,9 @@ class StepperProcess(multiprocessing.Process):
         self.driver.set_direction = direction
 
     def busy_loop(self):
+
+        self.pi.write(17, 1)  # Busy Flag
+
         self.init_move()
 
         self.pi.wave_clear()
@@ -600,8 +611,10 @@ class StepperProcess(multiprocessing.Process):
                     while self.pi.wave_tx_busy():  # wait for all pulses to transmit
                         time.sleep(0.001)
                     self.pi.wave_clear()
+                    self.pi.write(17, 0)  # Busy Flag
                     return  # to the idle loop
 
+                self.pi.write(17, 0)  # Busy Flag
                 while self.pi.wave_tx_at() == current_wave_id:
                     # to keep the timing as tight as practical
                     # even at the expense of a high cpu load we just
@@ -610,6 +623,8 @@ class StepperProcess(multiprocessing.Process):
                     if self.c_pipe.poll():
                         command = self.c_pipe.recv()
                         self.command_handler(command)
+
+                self.pi.write(17, 1)  # Busy Flag
 
                 if prev_wave_id != -1:
                     self.pi.wave_delete(prev_wave_id)

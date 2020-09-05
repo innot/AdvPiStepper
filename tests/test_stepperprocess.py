@@ -324,7 +324,7 @@ class TestStepperProcess(unittest.TestCase):
         self.c_pipe.send(Command(Verb.MOVETO, 100))
         time.sleep(0.1)
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_CURRENT_SPEED))
-        if not self.r_pipe.poll(2):
+        if not self.r_pipe.poll(3):
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_CURRENT_SPEED, result.noun)
@@ -338,7 +338,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.start()
         self.c_pipe.send(Command(Verb.ACCELERATION, 1234))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_ACCELERATION))
-        if not self.r_pipe.poll(2):
+        if not self.r_pipe.poll(3):
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_ACCELERATION, result.noun)
@@ -364,7 +364,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.start()
         self.c_pipe.send(Command(Verb.MOVETO, 10))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_TARGET_POSITION))
-        if not self.r_pipe.poll(2):
+        if not self.r_pipe.poll(3):
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_TARGET_POSITION, result.noun)
@@ -395,7 +395,7 @@ class TestStepperProcess(unittest.TestCase):
         # Test Setter and Getter
         self.c_pipe.send(Command(Verb.FULL_STEPS_PER_REV, 123))
         self.c_pipe.send(Command(Verb.GET, Noun.VAL_FULL_STEPS_PER_REV))
-        if not self.r_pipe.poll(2):
+        if not self.r_pipe.poll(3):
             self.fail()
         result = self.r_pipe.recv()
         self.assertEqual(Noun.VAL_FULL_STEPS_PER_REV, result.noun)

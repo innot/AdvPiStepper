@@ -198,7 +198,6 @@ class UnipolarDriver(DriverBase):
         The generated wave starts with the given delay and then sets the GPIOs
         for the step.
         """
-        self._pi.write(17, 1)
 
         direction = self._current_direction
 
@@ -226,6 +225,5 @@ class UnipolarDriver(DriverBase):
                 wave.append(pigpio.pulse(pin_on, 0, 0))
 
         #        print(f"seq[{next_step}] = {next_seq} @ {t.perf_counter_ns()}")
-        self._pi.write(17, 0)
 
         return wave

@@ -57,10 +57,35 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(50, self.apis.target_position, "wrong target_position")
         self.assertEqual(50, self.apis.current_position, "wrong current_position")
 
-        self.apis.move(1, block=True
-                       )
+        self.apis.move(100, block=True)
+        self.assertEqual(150, self.apis.target_position, "wrong target_position")
+        self.assertEqual(150, self.apis.current_position, "wrong current_position")
+
+        self.apis.move(-200, block=True)
+        self.assertEqual(-50, self.apis.target_position, "wrong target_position")
+        self.assertEqual(-50, self.apis.current_position, "wrong current_position")
+
         self.apis.close()
         print("test move completed")
+
+    def test_move_to(self):
+        print("test move_to")
+        self.apis.move_to(100, block=True)
+        self.assertEqual(100, self.apis.target_position, "wrong target_position")
+        self.assertEqual(100, self.apis.current_position, "wrong current_position")
+
+        self.apis.move_to(50, block=True)
+        self.assertEqual(50, self.apis.target_position, "wrong target_position")
+        self.assertEqual(50, self.apis.current_position, "wrong current_position")
+
+        self.apis.move_to(-50, block=True)
+        self.assertEqual(-50, self.apis.target_position, "wrong target_position")
+        self.assertEqual(-50, self.apis.current_position, "wrong current_position")
+
+        self.apis.move_to(0, block=True)
+        self.assertEqual(0, self.apis.target_position, "wrong target_position")
+        self.assertEqual(0, self.apis.current_position, "wrong current_position")
+
 
     def test_close(self):
         print("test close")
