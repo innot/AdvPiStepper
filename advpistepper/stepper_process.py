@@ -563,8 +563,6 @@ class StepperProcess(multiprocessing.Process):
 
     def busy_loop(self):
 
-        self.pi.write(17, 1)  # Busy Flag
-
         self.init_move()
 
         self.pi.wave_clear()
@@ -609,10 +607,8 @@ class StepperProcess(multiprocessing.Process):
                     while self.pi.wave_tx_busy():  # wait for all pulses to transmit
                         time.sleep(0.001)
                     self.pi.wave_clear()
-                    self.pi.write(17, 0)  # Busy Flag
                     return  # to the idle loop
 
-                self.pi.write(17, 0)  # Busy Flag
                 while self.pi.wave_tx_at() == current_wave_id:
                     # to keep the timing as tight as practical
                     # even at the expense of a high cpu load we just
@@ -621,8 +617,6 @@ class StepperProcess(multiprocessing.Process):
                     if self.c_pipe.poll():
                         command = self.c_pipe.recv()
                         self.command_handler(command)
-
-                self.pi.write(17, 1)  # Busy Flag
 
                 if prev_wave_id != -1:
                     self.pi.wave_delete(prev_wave_id)

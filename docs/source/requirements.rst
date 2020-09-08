@@ -1,6 +1,10 @@
 Requirements
 ------------
 
+   "One small step for [a] man"
+   -- Neil Armstrong
+
+
 AdvPiStepper uses the `pigpio <http://abyz.me.uk/rpi/pigpio/>`__
 library to access the Raspberry Pi GPIO pins.
 It requires at least V76 of the library, which at the

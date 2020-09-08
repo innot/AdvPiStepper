@@ -9,13 +9,14 @@
 #
 """
 Driver for the popular 28BYJ-48 stepper motor.
+
 The 28BYJ-48 is a small, 5V or 12V stepper motor with an integrated reduction gear which
 results in 2048 full steps per revolution of the output shaft. Due to the high
-reduction gear (64:1), this stepper motor is rather slow
+reduction gear (64:1), this stepper motor is rather slow.
 Without any hacks (e.g. higher voltage; bipolar mods) and without much load
-the 28byj48 should be able to do about 15 rpm or about 500 steps per second.
+the 28BYJ-48 should be able to do about 15 rpm or about 500 steps per second.
 
-The 28BYJ48 is a unipolar motor and is often sold together with a small driver board
+The 28BYJ-48 is a unipolar motor and is often sold together with a small driver board
 based on the ULN2003 Darlington array for less than 3€.
 
 This driver just defines the following parameters for this motor, guessed from this
@@ -26,7 +27,7 @@ There are numerous variants of the 28BYJ-48 on the market with slightly differen
 these parameters are on the conservative side. Each can be overriden by providing an optional
 dictionary with alternative values to the constructor.
 
-- MAX_SPEED: 600 steps/second
+- MAX_SPEED: 650 steps/second (~10 rpm)
 - MAX_TORQUE_SPEED: 120 steps/second
 - ACCELERATION_RATE: 2000 steps / second^2
 - DECELERATION_RATE: 4000 steps / second^2
@@ -42,8 +43,8 @@ to be standard for all 28BYJ-48 variants.
 - pink / orange for A+ and A-
 - yellow / blue for B+ and B-
 
-.. note:
-    The motoe wires should not be connected to the Raspberry directly. To provide sufficient
+.. note::
+    The motor wires should not be connected to the Raspberry directly. To provide sufficient
     power to the motor a driver like the `ULN2003A <https://en.wikipedia.org/wiki/ULN20030>`__
     should be used.
 """
@@ -65,9 +66,9 @@ class Driver28BYJ48(UnipolarDriver):
     :type parameters: dict, optional
     """
 
-    _defaults: Dict[str, Any] = {
+    _28byj48_defaults: Dict[str, Any] = {
         DRIVER_NAME: "28BYJ-48",
-        MAX_SPEED: 600.0,
+        MAX_SPEED: 650.0,
         MAX_TORQUE_SPEED: 120.0,
         ACCELERATION_RATE: 2000,
         # TBD: for now an arbitrary number to accelerate to full speed in approx. 1/4 second
@@ -79,7 +80,7 @@ class Driver28BYJ48(UnipolarDriver):
 
     def __init__(self, pink, orange, yellow, blue, parameters: Dict[str, Any] = None):
 
-        p: Dict[str, Any] = self._defaults  # default values
+        p: Dict[str, Any] = self._28byj48_defaults  # default values
         if parameters is not None:
             p.update(parameters)  # replace defaults with custom values
 

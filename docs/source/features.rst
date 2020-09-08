@@ -1,6 +1,9 @@
 Features
 --------
 
+   "Here comes the Hotstepper"
+   -- Ini Kamoze
+
 * Uses acceleration and deceleration ramps.
 * Fairly tight timing up to approx. 1500 steps per second (on Raspberry Pi 4) [#]_.
 * Complete API for relative and absolute moves, rotations and continuous running.

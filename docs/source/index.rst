@@ -22,30 +22,22 @@ AdvPiStepper is a driver for all kinds of stepper motors, written in Python for 
    Feel free to look at the source code and give feedback, but do not expect it to work
    in any shape or form.
 
-..
-
-   "Here comes the Hotstepper"
-   -- Ini Kamoze
 
 .. include:: features.rst
 
-..
-
-   "One small step for [a] man"
-   -- Neil Armstrong
 
 .. include:: requirements.rst
 
-..
-
-   "Step by step, Heart to heart, Left, right, left"
-   -- Martika
 
 .. include:: usage.rst
 
 
 Theory of Operation
 -------------------
+
+   "Step by step, Heart to heart, Left, right, left"
+   -- Martika
+
 
 History
 -------

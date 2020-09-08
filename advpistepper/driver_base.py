@@ -164,17 +164,32 @@ class DriverBase(object):
     @property
     def microsteps(self) -> int:
         """The currently set number of microsteps.
-        This method will only be successful if the driver is ready for a change in
-        microsteps, which can be checked with :meth:`steps_until_change_microsteps` method.
+
+        This property is read only. Use :meth:`set_microsteps` to change the microsteps.
+
         """
         return self._microsteps
 
-    @microsteps.setter
-    def microsteps(self, steps: int):
+    def set_microsteps(self, steps: int) -> bool:
+        """
+        Set the microsteps.
+
+        This method will only be successful if the driver is ready for a change in
+        microsteps, which can be checked with :meth:`steps_until_change_microsteps` method.
+
+        :param steps: Value from the list of MICROSTEP_OPTIONS.
+        :type steps: int
+        :return: 'True' if the change was successfull, 'False' if the microsteps could not be changed.
+        """
+        # The base driver (which does not do any GPIO) accepts all microstep values and
+        # therefore always returns True.
+        # Subclasses must override this method.
         self._microsteps = steps  # should be overridden by subclasses
+        return True
 
     def steps_until_change_microsteps(self, microsteps: int) -> int:
         """Checks when the the requested microstep setting can be changed.
+
         The result is in steps. If the result is 0 the driver is ready for a
         change in microsteps. Positive values are the number of steps which have
         to be performed before the change is possible (e.g. to sync to the next
@@ -182,6 +197,8 @@ class DriverBase(object):
         to the new value, either because it is not supported or the change can only be
         made when the motor is not running.
 
+        :param microsteps: Requested microstep option, either FULLSTEP (1) or HALFSTEP (2)
+        :type microsteps: int
         :returns:   number of steps before microsteps value can be changed.
             0 if change is possible right now.
             negative if the requested microsteps can not be set at the moment.
