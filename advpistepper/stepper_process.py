@@ -13,6 +13,7 @@
 import time
 import os
 import multiprocessing
+import logging
 import pigpio
 
 from dataclasses import dataclass
@@ -268,7 +269,7 @@ class StepperProcess(multiprocessing.Process):
         verb = command.verb
         noun = command.noun
 
-        print(f"received verb={verb}, noun={noun}")
+        logging.debug(f"Backend: received verb={verb}, noun={noun}")
 
         if verb == Verb.SPEED:
             self.set_speed(float(noun))
@@ -577,7 +578,7 @@ class StepperProcess(multiprocessing.Process):
         self.pi.wave_send_once(current_wave_id)
 
         # calculate the initial delay
-        delay = self.calculate_delay()
+        delay = self.calculate_delay
 
         try:
             while not self.quit_now:
@@ -585,9 +586,6 @@ class StepperProcess(multiprocessing.Process):
                 wave = self.driver.perform_step(delay)
                 self.pi.wave_add_generic(wave)
                 next_wave_id = self.pi.wave_create_and_pad(10)
-
-                #            print(f"id:{next_wave_id}, pulses: {self._pi.wave_get_pulses()}, \
-                #                           duration {self._pi.wave_get_micros()}")
 
                 self.pi.wave_send_using_mode(next_wave_id, pigpio.WAVE_MODE_ONE_SHOT_SYNC)
 
@@ -604,7 +602,7 @@ class StepperProcess(multiprocessing.Process):
 
                 # use the time while the current and next wave are being transmitted
                 # to calculate the delay of the next step
-                delay = self.calculate_delay()
+                delay = self.calculate_delay
 
                 if delay == 0:
                     # move finished, clean up all waves
@@ -639,6 +637,7 @@ class StepperProcess(multiprocessing.Process):
             # close shop and go home
             return
 
+    @property
     def calculate_delay(self) -> int:
 
         data = self.cd
@@ -699,6 +698,7 @@ class StepperProcess(multiprocessing.Process):
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
-        # print(f"{self.current_position}, {data.step}, {data.state}, {int(data.c_n)}, {int(data.speed)}, {decel_steps}")
+        logging.debug(f"CurrPos:{self.current_position}, Step:{data.step}, State:{data.state}, "
+                      f"c_n:{int(data.c_n)}, CurrSpeed:{int(data.speed)}, DecelSteps:{decel_steps}")
 
         return int(data.c_n)

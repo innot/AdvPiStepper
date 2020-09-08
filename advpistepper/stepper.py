@@ -12,6 +12,7 @@
 
 import time
 import multiprocessing
+import logging
 from typing import Dict, Any, Union
 
 # local imports
@@ -226,7 +227,7 @@ class AdvPiStepper(object):
             second) will be scaled by new_microsteps / old_microsteps.
 
         Trying to set a value that is not supported by the driver will cause a
-        `ValueError`exception.
+        `ValueError` exception.
 
         :type: int
         """
@@ -236,7 +237,6 @@ class AdvPiStepper(object):
     @microsteps.setter
     def microsteps(self, steps: int):
         if steps not in self.parameters[MICROSTEP_OPTIONS]:
-            print(self.parameters)
             raise ValueError(
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
@@ -244,7 +244,9 @@ class AdvPiStepper(object):
         ready = self.r_pipe.poll(1.0)    # Should not time out - just in case
         if ready:
             retval = self.r_pipe.recv()
-            print(f"microstep change returned:{retval}")
+            # todo do something with the returned value, which is the position at which the step change
+            # will occur.
+
         else:
             raise EOFError("Microstep change timed out. Maybe backend down?")
 
@@ -443,12 +445,12 @@ class AdvPiStepper(object):
         :raises EOFError: when the backend does not acknowlege the command.
         """
         cmd = Command(verb, noun)
-#        print(f"send command {cmd}")
+        logging.debug(f"Frontend: send command {cmd}")
         self.c_pipe.send(cmd)
         ack = self.c_pipe.poll(3.0)  # 3 seconds is rather long but required when accessing a remote Pi.
         if ack:
             retval = self.c_pipe.recv()
-            print(f"retval for cmd {cmd}:{retval}")
+            logging.debug(f"Frontend: cmd {cmd} acknowledged")
         else:
             raise EOFError("Command not acknowledged after 3 second. Maybe backend down?")
 
@@ -468,12 +470,12 @@ class AdvPiStepper(object):
         result = self.r_pipe.recv()
         if result.noun != noun:
             # todo do something with the unexpected result
-            print(f"received unexpected result {result}")
+            logging.error(f"received unexpected result {result}")
         else:
             return result.value
 
     def _wait_for_idle(self):
-        print(f"Waiting for idle @time {time.time()}")
+        logging.debug(f"Frontend: Waiting for idle @time {time.time()}")
         self.run_lock.acquire()
         self.run_lock.release()
-        print(f"Idle received @time {time.time()}")
+        logging.debug(f"Frontend:Idle received @time {time.time()}")

@@ -15,8 +15,9 @@ CW and CCW constants defining clockwise / couterclockwise motions.
 
 The Keys which are used as parameters to describe a motor and the driver.
 
+* DRIVER_NAME            Human readable name of the driver.
 * MAX_SPEED:            Maximum speed in steps per second. This is not a limit, just a recommendation.
-* MAX_TORQUE_SPEED:     Maximum speed at which the motor will still deliver full torque.
+* MAX_TORQUE_SPEED:     Maximum speed at which the motor will still deliver full torque (optional, if known)
 * ACCELERATION_RATE:    Acceleration in steps per second squared.
 * DECELERATION_RATE:    Deceleration in steps per second squared.
 * FULL_STEPS_PER_REV:   Number of full (not micro-)steps per one revolution.
@@ -39,6 +40,7 @@ True direction may depend on the wiring of the stepper motor."""
 
 
 # Parameter Keys
+DRIVER_NAME: str = "driver_name"
 
 MAX_SPEED: str = "max_speed"
 """Maximum speed in steps per second. This is not a limit, just a recommendation"""

@@ -22,7 +22,7 @@ This driver just defines the following parameters for this motor, guessed from t
 `datasheet <https://www.digikey.de/de/datasheets/mikroelektronika/mikroelektronika-step-motor-5v-28byj48-datasheet>`__
 with the help of the `stepper motor glossary <https://www.anaheimautomation.com/support/stepper_motor_glossary.htm>`__
 
-There are numerous variants of the 28BYJ48 on the market with slightly different parameters, so
+There are numerous variants of the 28BYJ-48 on the market with slightly different parameters, so
 these parameters are on the conservative side. Each can be overriden by providing an optional
 dictionary with alternative values to the constructor.
 
@@ -34,13 +34,18 @@ dictionary with alternative values to the constructor.
 - MICROSTEP_OPTIONS: FULLSTEP or HALFSTEP.
 - MICROSTEP_DEFAULT: HALFSTEP
 
-Halfstep is the recommended rate for the 28BYJ48
+Halfstep is the recommended rate for the 28BYJ-48
 
 Besides the motor characteristics this driver uses colors for the 4 control wires which seem
-to be standard for all 28BYJ48 variants.
+to be standard for all 28BYJ-48 variants.
 
 - pink / orange for A+ and A-
 - yellow / blue for B+ and B-
+
+.. note:
+    The motoe wires should not be connected to the Raspberry directly. To provide sufficient
+    power to the motor a driver like the `ULN2003A <https://en.wikipedia.org/wiki/ULN20030>`__
+    should be used.
 """
 
 from advpistepper.driver_unipolar_generic import *
@@ -61,7 +66,7 @@ class Driver28BYJ48(UnipolarDriver):
     """
 
     _defaults: Dict[str, Any] = {
-        "drivername": "28BYJ48",
+        DRIVER_NAME: "28BYJ-48",
         MAX_SPEED: 600.0,
         MAX_TORQUE_SPEED: 120.0,
         ACCELERATION_RATE: 2000,

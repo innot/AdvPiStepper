@@ -7,6 +7,7 @@ HALFSTEP = 2
 
 class UnipolarDriver(DriverBase):
     ud_defaults: Dict[str, Any] = {
+        DRIVER_NAME: "Generic Unipolar",
         MAX_SPEED: 1000.0,
         MAX_TORQUE_SPEED: 100.0,
         ACCELERATION_RATE: 2000,
@@ -223,7 +224,5 @@ class UnipolarDriver(DriverBase):
                 # a currently unset pin needs to be switched on
                 pin_on = self._gpio_pins_masks[i]
                 wave.append(pigpio.pulse(pin_on, 0, 0))
-
-        #        print(f"seq[{next_step}] = {next_seq} @ {t.perf_counter_ns()}")
 
         return wave

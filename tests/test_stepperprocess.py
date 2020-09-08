@@ -217,7 +217,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.continuous(CW)
         self.assertEqual(float('inf'), self.process.target_position)
         # check that the delay calculation works with infinity
-        delay = self.process.calculate_delay()
+        delay = self.process.calculate_delay
         self.assertTrue(0 < delay < sys.maxsize)
         self.assertEqual(ACCEL, self.process.cd.state)
 
@@ -226,7 +226,7 @@ class TestStepperProcess(unittest.TestCase):
 
         self.process.continuous(CCW)
         self.assertEqual(float('-inf'), self.process.target_position)
-        delay = self.process.calculate_delay()
+        delay = self.process.calculate_delay
         self.assertTrue(0 < delay < sys.maxsize)
         self.assertEqual(ACCEL, self.process.cd.state)
 
@@ -262,7 +262,7 @@ class TestStepperProcess(unittest.TestCase):
 
         self.process.target_position = 123456
         self.process.current_position = 0
-        self.process.calculate_delay()
+        self.process.calculate_delay
 
         self.process.stop()
         self.assertEqual(self.process.cd.decel_steps, self.process.target_position)
@@ -271,7 +271,7 @@ class TestStepperProcess(unittest.TestCase):
         self.process.cd.current_direction = CCW
         self.process.target_position = -123456
         self.process.current_position = 0
-        self.process.calculate_delay()
+        self.process.calculate_delay
 
         self.process.stop()
         self.assertEqual(-self.process.cd.decel_steps, self.process.target_position)

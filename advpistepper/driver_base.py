@@ -25,6 +25,7 @@ class DriverBase(object):
     """
 
     db_defaults: Dict[str, Any] = {
+        DRIVER_NAME: "Debug Driver (No GPIO)",
         MAX_SPEED: 1000.0,
         MAX_TORQUE_SPEED: 100.0,
         ACCELERATION_RATE: 1000,
@@ -169,9 +170,8 @@ class DriverBase(object):
         return self._microsteps
 
     @microsteps.setter
-    def microsteps(self, steps: int) -> bool:
+    def microsteps(self, steps: int):
         self._microsteps = steps  # should be overridden by subclasses
-        return True
 
     def steps_until_change_microsteps(self, microsteps: int) -> int:
         """Checks when the the requested microstep setting can be changed.
