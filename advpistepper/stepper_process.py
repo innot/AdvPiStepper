@@ -8,7 +8,14 @@
 #
 #
 
-""" Stepper Driver"""
+"""
+The backend Process for the AdvPiStepper.
+
+This class accepts commands from the frontend, calculates target positions and speed,
+including accelerations and decelerations, and finally converts these into steps and
+the time delay between them. A driver is then used to generate pigpio pulse sequences
+which can finally be sent to the pigpio daemon for the actual GPIO pulses.
+"""
 
 import time
 import os
@@ -24,29 +31,32 @@ from typing import Dict, Any, Union
 from .common import *
 from .driver_base import DriverBase
 
-# All states of the stepper
-IDLE = 0
-"""Stepper is not running and the coils are deenergized."""
 
-STOP = 1
-"""Stepper is not running but the coils are energized
-to hold the last position."""
+class State(Enum):
+    """Enum of all states of the stepper engine."""
 
-ACCEL = 2
-"""Stepper is accelerating to the target speed."""
+    IDLE = auto()
+    """Stepper is not running and the coils are deenergized."""
 
-INC = 3
-"""After being in the RUN state the stepper is accelerating to
-a new target speed."""
+    STOP = auto()
+    """Stepper is not running but the coils are energized
+    to hold the last position."""
 
-RUN = 4
-"""Stepper is running at the given target speed."""
+    ACCEL = auto()
+    """Stepper is accelerating to the target speed."""
 
-DEC = 5
-"""Stepper is decelerating to a new, slower target speed."""
+    INC = auto()
+    """After being in the RUN state the stepper is accelerating to
+    a new target speed."""
 
-DECEL = 6
-"""Stepper is decelerating to a STOP."""
+    RUN = auto()
+    """Stepper is running at the target speed."""
+
+    DEC = auto()
+    """Stepper is decelerating to a new, slower target speed."""
+
+    DECEL = auto()
+    """Stepper is decelerating to a STOP."""
 
 
 @dataclass
@@ -55,7 +65,7 @@ class ControllerData:
     Object containing all data for the speed controller.
     """
 
-    state: int = IDLE
+    state: int = State.IDLE
     """Current state of the stepper."""
 
     current_direction: int = 0
@@ -185,16 +195,27 @@ class Result(object):
         self.value = value
 
 
-@dataclass
-class Statistics(object):
-    number_of_steps: int = 0
-    runtime: int = 0
-
-
 class StepperProcess(multiprocessing.Process):
+    """
+    Stepper engine background process.
+
+    :param command_pipe: Pipe which will receive :class:`Command` objects.
+    :type command_pipe: multiprocessing.Pipe
+    :param results_pipe: Pipe where :class:`Result` objects are send back to the frontend.
+    :type results_pipe: multiprocessing.Pipe
+    :param run_lock: A lock which the backend uses while busy
+    :type run_lock: multiprocessing.Lock
+    :param driver:
+        The GPIO driver used to translate steps to pigpio pulses
+        and waves.
+    :type driver: DriverBase
+    :param parameters:
+        Optinal list of parameters to override default values.
+    :type parameters: Dict[str,Any]
+    """
 
     def __init__(self, command_pipe: multiprocessing.Pipe, results_pipe: multiprocessing.Pipe,
-                 run_lock,
+                 run_lock: multiprocessing.Lock,
                  driver: DriverBase = None, parameters: Dict[str, Any] = None):
         super(StepperProcess, self).__init__()
 
@@ -323,14 +344,14 @@ class StepperProcess(multiprocessing.Process):
         # Check if the motor is already running
         # if yes, then accelerate / decelerate, but only if not already
         # accelerating or decelarating to a step
-        if speed > old_speed and (self.cd.state == RUN or self.cd.state == DEC):
+        if speed > old_speed and (self.cd.state == State.RUN or self.cd.state == State.DEC):
             # Austin Eq.16, Changes of acceleration
             self.cd.step = int((speed * speed) / (2.0 * self.acceleration))
-            self.cd.state = INC
-        elif speed < old_speed and (self.cd.state == RUN or self.cd.state == INC):
+            self.cd.state = State.INC
+        elif speed < old_speed and (self.cd.state == State.RUN or self.cd.state == State.INC):
             # see above, with negative sign to cause a deceleration
             self.cd.step = int(-(speed * speed) / (2.0 * self.deceleration))
-            self.cd.state = DEC
+            self.cd.state = State.DEC
 
         # Set the actual target parameter
         self.cd.c_target = 1000000 / speed
@@ -488,7 +509,7 @@ class StepperProcess(multiprocessing.Process):
         self.driver.hard_stop()
 
         # stop the engine
-        self.cd.state = STOP
+        self.cd.state = State.STOP
         self.cd.speed = 0.0
         self.cd.step = 0
 
@@ -647,16 +668,16 @@ class StepperProcess(multiprocessing.Process):
             # target position reached, move completed
             data.speed = 0.0
             data.step = 0
-            data.state = STOP
+            data.state = State.STOP
             return 0
 
         if delta_position * data.current_direction < 0:
             # direction reversal
-            data.state = DECEL
+            data.state = State.DECEL
             data.step = -int(decel_steps)
 
-        elif abs(delta_position) <= decel_steps and data.state != DECEL:
-            data.state = DECEL
+        elif abs(delta_position) <= decel_steps and data.state != State.DECEL:
+            data.state = State.DECEL
             data.step = -int(decel_steps)
 
         if data.step == 0:
@@ -664,7 +685,7 @@ class StepperProcess(multiprocessing.Process):
             data.c_n = data.c_0
             data.step = 1
 
-            if data.state == DECEL:
+            if data.state == State.DECEL:
                 # 0-point of a reversal
                 # officially change direction.
                 if delta_position > 0:
@@ -673,19 +694,19 @@ class StepperProcess(multiprocessing.Process):
                     data.current_direction = CCW
                 self.driver.direction = data.current_direction
 
-            data.state = ACCEL
+            data.state = State.ACCEL
 
-        elif data.state == ACCEL or data.state == INC:
+        elif data.state == State.ACCEL or data.state == State.INC:
             data.c_n = data.c_n - ((2.0 * data.c_n) / ((4.0 * data.step) + 1))
 
             if data.c_n <= data.c_target:
                 # selected speed reached. Change to constant speed mode.
                 data.c_n = data.c_target
-                data.state = RUN
+                data.state = State.RUN
             else:
                 data.step += 1
 
-        elif data.state == DECEL or data.state == DEC:
+        elif data.state == State.DECEL or data.state == State.DEC:
             data.c_n = data.c_n - ((2.0 * data.c_n) / ((4.0 * data.step) + 1))
             data.step += 1
 

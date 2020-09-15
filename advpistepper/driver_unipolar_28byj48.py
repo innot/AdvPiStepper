@@ -45,7 +45,7 @@ to be standard for all 28BYJ-48 variants.
 
 .. note::
     The motor wires should not be connected to the Raspberry directly. To provide sufficient
-    power to the motor a driver like the `ULN2003A <https://en.wikipedia.org/wiki/ULN20030>`__
+    power to the motor a driver like the `ULN2003A <https://en.wikipedia.org/wiki/ULN2003A>`__
     should be used.
 """
 

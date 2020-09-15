@@ -7,6 +7,12 @@ Usage
 Installation
 ............
 
+.. code-block:: bash
+pip3 install advpistepper
+
+
+Usage
+.....
 AdvPiStepper is very simple to use.
 
 .. highlight:: python
@@ -20,4 +26,11 @@ AdvPiStepper is very simple to use.
    stepper = advpistepper.AdvPiStepper(driver)
    stepper.move(100)
 
+
+Refer to :mod:`the API <advpistepper.stepper>`
+
+If AdvPiStepper is called with root privileges (sudo) it will
+decrease the niceness of the backend process to -10. This improves the
+timing at high speeds somewhat due to less interference by all normal
+user processes.
 

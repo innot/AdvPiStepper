@@ -34,7 +34,7 @@ the A+, A-, B+ and B- coils (called a1, a2, b1 and b2 by the driver)
 .. note::
     Except for very low power stepper motors the motor wires should not be connected
     to the Raspberry directly. To provide sufficient power to the motor a driver like
-    the `ULN2003A <https://en.wikipedia.org/wiki/ULN20030>`__ should be used.
+    the `ULN2003A <https://en.wikipedia.org/wiki/ULN2003A>`__ should be used.
 
 """
 

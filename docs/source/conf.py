@@ -191,3 +191,4 @@ todo_include_todos = True
 
 # Autodoc options
 autodoc_member_order = 'bysource'
+autodoc_typehints = 'description'

@@ -14,19 +14,19 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QGroupBox" name="groupBox">
+   <widget class="QGroupBox" name="speed_groupbox">
     <property name="geometry">
      <rect>
       <x>60</x>
       <y>160</y>
       <width>371</width>
-      <height>71</height>
+      <height>91</height>
      </rect>
     </property>
     <property name="title">
      <string>Speed</string>
     </property>
-    <widget class="QDoubleSpinBox" name="speedSpinBox">
+    <widget class="QSpinBox" name="speed_spinbox">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -35,8 +35,11 @@
        <height>22</height>
       </rect>
      </property>
+     <property name="maximum">
+      <number>2000</number>
+     </property>
     </widget>
-    <widget class="QSlider" name="speedSlider">
+    <widget class="QSlider" name="speed_slider">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -46,10 +49,10 @@
       </rect>
      </property>
      <property name="minimum">
-      <number>-1000</number>
+      <number>0</number>
      </property>
      <property name="maximum">
-      <number>1000</number>
+      <number>2000</number>
      </property>
      <property name="pageStep">
       <number>50</number>
@@ -61,7 +64,7 @@
       <enum>QSlider::TicksBelow</enum>
      </property>
     </widget>
-    <widget class="QLabel" name="label">
+    <widget class="QLabel" name="sps_label">
      <property name="geometry">
       <rect>
        <x>80</x>
@@ -74,7 +77,7 @@
       <string>Steps per Second</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="pushButton">
+    <widget class="QPushButton" name="run_button">
      <property name="geometry">
       <rect>
        <x>290</x>
@@ -88,20 +91,46 @@
      </property>
     </widget>
    </widget>
-   <widget class="QGroupBox" name="groupBox_2">
+   <widget class="QGroupBox" name="position_groupbox">
     <property name="geometry">
      <rect>
       <x>60</x>
-      <y>240</y>
+      <y>260</y>
       <width>371</width>
       <height>80</height>
      </rect>
     </property>
     <property name="title">
-     <string>Steps</string>
+     <string>Position</string>
     </property>
+    <widget class="QLabel" name="curr_pos_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>71</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Current Position</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="curr_pos_value_label">
+     <property name="geometry">
+      <rect>
+       <x>80</x>
+       <y>23</y>
+       <width>39</width>
+       <height>11</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
    </widget>
-   <widget class="QGroupBox" name="groupBox_3">
+   <widget class="QGroupBox" name="rotation_groupbox">
     <property name="geometry">
      <rect>
       <x>59</x>
@@ -111,9 +140,9 @@
      </rect>
     </property>
     <property name="title">
-     <string>Rotations</string>
+     <string>Rotation</string>
     </property>
-    <widget class="QDial" name="dial">
+    <widget class="QDial" name="rotation_dial">
      <property name="geometry">
       <rect>
        <x>20</x>
@@ -135,23 +164,26 @@
       <bool>true</bool>
      </property>
     </widget>
-    <widget class="QDoubleSpinBox" name="doubleSpinBox">
+    <widget class="QSpinBox" name="rotation_spinbox">
      <property name="geometry">
       <rect>
        <x>90</x>
-       <y>10</y>
+       <y>30</y>
        <width>62</width>
        <height>22</height>
       </rect>
      </property>
+     <property name="maximum">
+      <number>359</number>
+     </property>
     </widget>
-    <widget class="QLabel" name="label_2">
+    <widget class="QLabel" name="degrees_label">
      <property name="geometry">
       <rect>
        <x>160</x>
-       <y>20</y>
+       <y>36</y>
        <width>39</width>
-       <height>11</height>
+       <height>10</height>
       </rect>
      </property>
      <property name="text">
@@ -173,5 +205,70 @@
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>rotation_dial</sender>
+   <signal>sliderMoved(int)</signal>
+   <receiver>rotation_spinbox</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>103</x>
+     <y>411</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>179</x>
+     <y>410</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>speed_slider</sender>
+   <signal>sliderMoved(int)</signal>
+   <receiver>speed_spinbox</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>210</x>
+     <y>240</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>100</x>
+     <y>210</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>speed_spinbox</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>speed_slider</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>100</x>
+     <y>210</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>210</x>
+     <y>240</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>rotation_spinbox</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>rotation_dial</receiver>
+   <slot>setValue(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>179</x>
+     <y>410</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>103</x>
+     <y>411</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

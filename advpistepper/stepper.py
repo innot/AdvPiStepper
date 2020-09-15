@@ -54,7 +54,7 @@ class AdvPiStepper(object):
         self.process = StepperProcess(c_pipe_remote, r_pipe_remote, self.run_lock, driver, params)
 
         self.process.start()
-        self.send_cmd(Verb.NOP, None)  # Wait for the Process to be ready
+        self._send_cmd(Verb.NOP, None)  # Wait for the Process to be ready
         self._wait_for_idle()
 
         self.parameters = params  # keep the current parameters for reference
@@ -103,6 +103,10 @@ class AdvPiStepper(object):
         This is the speed the stepper will accelerate to and maintain during moves.
         It is independant of the direction and must be greater than 0.
         Setting a target speed of 0 or less will cause a `ValueError` exception.
+
+        .. note::
+            High values (>1.000 sps) may cause timing jitter and even lost steps.
+
         :type: float
         """
         result = float(self._get_value(Noun.VAL_TARGET_SPEED))
@@ -113,7 +117,7 @@ class AdvPiStepper(object):
         if speed <= 0.0:
             raise ValueError(f"Speed must be > 0.0, was {speed}")
 
-        self.send_cmd(Verb.SPEED, speed)
+        self._send_cmd(Verb.SPEED, speed)
 
     @property
     def current_speed(self) -> float:
@@ -134,13 +138,14 @@ class AdvPiStepper(object):
     @property
     def acceleration(self) -> float:
         """
-        The current acceleration rate in steps / microsteps per second :sup:`2`
+        The current acceleration rate in steps or microsteps per second :sup:`2`
 
         This property will override any default acceleration rate
         set by the driver. Any changes to this rate will be applied
         immediately and will affect any ongoing acceleration.
 
-        High values may cause lost steps and motor stalls.
+        .. note::
+            High values may cause lost steps and motor stalls.
 
         The value must be greater than zero. Trying to set a value of 0 or less will
         cause a `ValueError` exception.
@@ -155,18 +160,19 @@ class AdvPiStepper(object):
         if rate <= 0.0:
             raise ValueError(f"Acceleration must be greater than 0.0, was {rate}")
 
-        self.send_cmd(Verb.ACCELERATION, rate)
+        self._send_cmd(Verb.ACCELERATION, rate)
 
     @property
     def deceleration(self):
         """
-        The current deceleration rate in steps / microsteps per second :sup:`2`
+        The current deceleration rate in steps or microsteps per second :sup:`2`
 
         This property will override any default deceleration rate
         set by the driver. Any changes to this rate will be applied
         immediately and will affect any ongoing deceleration.
 
-        High values may cause lost steps due to motor inertia.
+        .. note::
+            High values may cause unaccounted steps due to motor inertia.
 
         The value must be greater than zero. Trying to set a value of 0 or less will
         cause a `ValueError` exception.
@@ -181,7 +187,7 @@ class AdvPiStepper(object):
         if rate <= 0.0:
             raise ValueError(f"Deceleration must be greater than 0.0, was {rate}")
 
-        self.send_cmd(Verb.DECELARATION, rate)
+        self._send_cmd(Verb.DECELARATION, rate)
 
     @property
     def full_steps_per_rev(self) -> int:
@@ -206,7 +212,7 @@ class AdvPiStepper(object):
         if steps < 0:
             raise ValueError("steps must be 2 or greater")
 
-        self.send_cmd(Verb.FULL_STEPS_PER_REV, steps)
+        self._send_cmd(Verb.FULL_STEPS_PER_REV, steps)
 
     @property
     def microsteps(self) -> int:
@@ -240,7 +246,7 @@ class AdvPiStepper(object):
             raise ValueError(
                 f"Given microstep setting ({steps}) is not valid. Options are {self.parameters[MICROSTEP_OPTIONS]}")
 
-        self.send_cmd(Verb.MICROSTEPS, steps)
+        self._send_cmd(Verb.MICROSTEPS, steps)
         ready = self.r_pipe.poll(1.0)    # Should not time out - just in case
         if ready:
             retval = self.r_pipe.recv()
@@ -266,8 +272,8 @@ class AdvPiStepper(object):
         :param speed:   Target speed in steps or microsteps per second.
                         Must be >0. Optional, default is the most recent target speed.
         :type speed: float
-        :param block:   When 'True' waits for the move to complete.
-                        Default 'False', i.e. call will return immediately.
+        :param block:   When `True` waits for the move to complete.
+                        Default `False`, i.e. call will return immediately.
         :type block:    bool
         :raises ValueError: if the speed is 0 or less.
                 """
@@ -277,9 +283,9 @@ class AdvPiStepper(object):
         if speed is not None:
             if speed <= 0.0:
                 raise ValueError(f"Argument speed must be > 0.0, was {speed}")
-            self.send_cmd(Verb.SPEED, speed)
+            self._send_cmd(Verb.SPEED, speed)
 
-        self.send_cmd(Verb.MOVE, steps)
+        self._send_cmd(Verb.MOVE, steps)
 
         if block:
             self._wait_for_idle()
@@ -297,8 +303,8 @@ class AdvPiStepper(object):
         :param speed:   Target speed in steps or microsteps per second.
                         Must be >0. Optional, default is the most recent target speed.
         :type speed: float
-        :param block:   When 'True' waits for the move to complete.
-                        Default 'False', i.e. call will return immediately.
+        :param block:   When `True` waits for the move to complete.
+                        Default `False`, i.e. call will return immediately.
         :type block:    bool
         :raises ValueError: if the speed is 0 or less.
         """
@@ -308,9 +314,9 @@ class AdvPiStepper(object):
         if speed is not None:
             if speed <= 0.0:
                 raise ValueError(f"Argument speed must be > 0.0, was {speed}")
-            self.send_cmd(Verb.SPEED, speed)
+            self._send_cmd(Verb.SPEED, speed)
 
-        self.send_cmd(Verb.MOVETO, position)
+        self._send_cmd(Verb.MOVETO, position)
 
         if block:
             self._wait_for_idle()
@@ -339,18 +345,18 @@ class AdvPiStepper(object):
         if speed < 0.0:
             raise ValueError(f"Argument speed must be greater than 0.0, was {speed}")
 
-        self.send_cmd(Verb.SPEED, speed)
-        self.send_cmd(Verb.RUN, direction)
+        self._send_cmd(Verb.SPEED, speed)
+        self._send_cmd(Verb.RUN, direction)
 
     def stop(self, block: bool = False):
         """
         Decelerate the motor to a complete stop.
 
-        :param block:   When 'True' waits for the stop to complete.
-                        Default 'False', i.e. call will return immediately.
+        :param block:   When `True` waits for the stop to complete.
+                        Default `False`, i.e. call will return immediately.
         :type block:    bool
         """
-        self.send_cmd(Verb.STOP)
+        self._send_cmd(Verb.STOP)
         if block:
             self._wait_for_idle()
 
@@ -366,11 +372,11 @@ class AdvPiStepper(object):
         anymore and it is up to the caller to get the motor to a consistent
         state if so required.
 
-        :param block:   When 'True' waits for the driver to initiate the hard stop.
-                        Default 'False', i.e. call will return immediately.
+        :param block:   When `True` waits for the driver to initiate the hard stop.
+                        Default `False`, i.e. call will return immediately.
         :type block:    bool
         """
-        self.send_cmd(Verb.HARD_STOP)
+        self._send_cmd(Verb.HARD_STOP)
         if block:
             self._wait_for_idle()
 
@@ -382,20 +388,20 @@ class AdvPiStepper(object):
         for the given number of steps. But after it has finished the current position
         will be the number of steps performed since the call to zero().
         """
-        self.send_cmd(Verb.ZERO)
+        self._send_cmd(Verb.ZERO)
 
     def engage(self, block: bool = False):
         """
         Energize the coils of the stepper motor.
 
         The coils are automatically engaged by any move / run command.
-        This mehtod should not be called while the motor is already moving.
+        This method should not be called while the motor is already moving.
 
-        :param block:   When 'True' waits for the driver to energize.
-                        Default 'False', i.e. call will return immediately.
+        :param block:   When `True` waits for the driver to energize.
+                        Default `False`, i.e. call will return immediately.
         :type block:    bool
         """
-        self.send_cmd(Verb.ENGAGE)
+        self._send_cmd(Verb.ENGAGE)
         if block:
             self._wait_for_idle()
 
@@ -410,12 +416,12 @@ class AdvPiStepper(object):
 
         Calling this method while a move is underway is similar to a hard stop.
 
-        :param block:   When 'True' waits for the driver to release.
-                        Default 'False', i.e. call will return immediately.
+        :param block:   When `True` waits for the driver to release.
+                        Default `False`, i.e. call will return immediately.
         :type block:    bool
 
         """
-        self.send_cmd(Verb.RELEASE)
+        self._send_cmd(Verb.RELEASE)
         if block:
             self._wait_for_idle()
 
@@ -427,7 +433,7 @@ class AdvPiStepper(object):
         This is called automatically when the AdvPiStepper object is garbage collected.
         """
         try:
-            self.send_cmd(Verb.QUIT)
+            self._send_cmd(Verb.QUIT)
             time.sleep(0.1)
             self.c_pipe.close()
             self.r_pipe.close()
@@ -436,8 +442,9 @@ class AdvPiStepper(object):
             # maybe the object is already closed.
             pass
 
-    def send_cmd(self, verb: Verb, noun: Union[int, float, Noun] = None):
+    def _send_cmd(self, verb: Verb, noun: Union[int, float, Noun] = None):
         """Send a command to the backend and wait until the backend has acknowledged.
+
         :param verb: The command to execute
         :type verb: Verb
         :param noun: An optional parameter
@@ -463,9 +470,10 @@ class AdvPiStepper(object):
         :param noun: The parameter to fetch.
         :type noun: Noun.
         :return: The requested value.
-        :rtype: object"""
+        :rtype: object
+        """
 
-        self.send_cmd(Verb.GET, noun)
+        self._send_cmd(Verb.GET, noun)
         self.r_pipe.poll(1)  # if no result after 1 second then the other Process is stuck
         result = self.r_pipe.recv()
         if result.noun != noun:
@@ -476,6 +484,6 @@ class AdvPiStepper(object):
 
     def _wait_for_idle(self):
         logging.debug(f"Frontend: Waiting for idle @time {time.time()}")
-        self.run_lock.acquire()
-        self.run_lock.release()
-        logging.debug(f"Frontend:Idle received @time {time.time()}")
+        self.run_lock.acquire()  # can only be acquired when released by the backend (i.e. not busy)
+        self.run_lock.release()  # release immediatly so that the backend can acquire it again.
+        logging.debug(f"Frontend: Idle received @time {time.time()}")
