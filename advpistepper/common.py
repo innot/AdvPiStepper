@@ -68,3 +68,16 @@ PIGPIO_ADDR = "pigpio_addr"
 
 PIGPIO_PORT = "pigpio_port"
 """The port on which the pigpio daemon is listening on. Default is empty to use the default pigpio port (8888)."""
+
+DIRECTION_INVERT = "direction_invert"
+"""If true then the direction signal is inverted by the driver, i.e. Clockwise and Counterclockwise are swaped."""
+
+# Paramaters of the Step/Dir Driver
+DIRECTION_CHANGE_DELAY = "direction_change_delay"
+"""The time between a change in direction and the first step pulse (in microseconds)"""
+
+STEP_PULSE_LENGTH = "step_pulse_length"
+"""The time for a step pulse (in microseconds)"""
+
+STEP_PULSE_DELAY = "step_pulse_delay"
+"""The minimum time between step pulses (in microseconds)"""

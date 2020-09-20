@@ -21,7 +21,9 @@ import time
 import os
 import multiprocessing
 import logging
+import gc
 import pigpio
+
 
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -403,7 +405,7 @@ class StepperProcess(multiprocessing.Process):
 
         self.microstep_change_at = None
 
-        self.driver.microsteps = self.microsteps
+        self.driver.set_microsteps(self.microsteps)
 
     def move(self, relative):
         if self.target_position == float('inf') or self.target_position == float('-inf'):
@@ -561,7 +563,9 @@ class StepperProcess(multiprocessing.Process):
                     command = self.c_pipe.recv()
                     self.command_handler(command)
                     if self.move_required:
+                        gc.disable()
                         self.busy_loop()
+                        gc.enable()
                         self.move_required = False
                     self.run_lock.release()  # ... and that we are twiddeling our thumbs again
         except EOFError:
@@ -580,7 +584,11 @@ class StepperProcess(multiprocessing.Process):
             direction = CW
 
         self.cd.current_direction = direction
-        self.driver.set_direction = direction
+
+        if self.params[DIRECTION_INVERT]:
+            direction = -direction
+
+        self.driver.direction = direction
 
     def busy_loop(self):
 
@@ -675,6 +683,7 @@ class StepperProcess(multiprocessing.Process):
             # direction reversal
             data.state = State.DECEL
             data.step = -int(decel_steps)
+            self.driver.direction = data.current_direction
 
         elif abs(delta_position) <= decel_steps and data.state != State.DECEL:
             data.state = State.DECEL
@@ -692,7 +701,11 @@ class StepperProcess(multiprocessing.Process):
                     data.current_direction = CW
                 else:
                     data.current_direction = CCW
-                self.driver.direction = data.current_direction
+
+                if self.params[DIRECTION_INVERT]:
+                    self.driver.direction = -data.current_direction
+                else:
+                    self.driver.direction = data.current_direction
 
             data.state = State.ACCEL
 
@@ -713,7 +726,7 @@ class StepperProcess(multiprocessing.Process):
         # Speed in steps per second
         data.speed = 1000000 / data.c_n
 
-        logging.debug(f"CurrPos:{self.current_position}, Step:{data.step}, State:{data.state}, "
-                      f"c_n:{int(data.c_n)}, CurrSpeed:{int(data.speed)}, DecelSteps:{decel_steps}")
+        #        logging.debug(f"CurrPos:{self.current_position}, Step:{data.step}, State:{data.state}, "
+        #                      f"c_n:{int(data.c_n)}, CurrSpeed:{int(data.speed)}, DecelSteps:{decel_steps}")
 
         return int(data.c_n)

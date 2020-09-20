@@ -28,6 +28,19 @@ Features
 .. [#] At high step rates occasional stutters may occur when some
     Python / Linux background tasks run.
 
+Uses
+....
+
+AdvPiStepper is suitable for
+* Python projects that need to accuratly control a single stepper motor
+at reasonable speeds.
+* Stepper Motor experiments
+
+It is not suitable for
+* multi-axis stepper motor projects
+* high speeds (> 1500 steps per second)
+
+
 Caveats
 .......
 

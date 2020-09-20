@@ -45,14 +45,14 @@ to be standard for all 28BYJ-48 variants.
 
 .. note::
     The motor wires should not be connected to the Raspberry directly. To provide sufficient
-    power to the motor a driver like the `ULN2003A <https://en.wikipedia.org/wiki/ULN2003A>`__
+    power to the motor a driver IC like the `ULN2003A <https://en.wikipedia.org/wiki/ULN2003A>`__
     should be used.
 """
 
 from advpistepper.driver_unipolar_generic import *
 
 
-class Driver28BYJ48(UnipolarDriver):
+class Driver28BYJ48(DriverUnipolarGeneric):
     """
     :param pink: GPIO pin the pink wire (A+)is connect to (Broadcom / pigpio numbering)
     :type pink: int

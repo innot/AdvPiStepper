@@ -45,7 +45,7 @@ FULLSTEP = 1
 HALFSTEP = 2
 
 
-class UnipolarDriver(DriverBase):
+class DriverUnipolarGeneric(DriverBase):
     """
     Basic Unpolar driver module.
 
