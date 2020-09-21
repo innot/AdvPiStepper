@@ -1,9 +1,4 @@
 #!/usr/bin/python3
-'''
-Created on 11.06.2020
-
-@author: thoma
-'''
 
 import sys
 import time
@@ -37,13 +32,13 @@ def main(argv):
 
     stepper.microsteps = 1
 
-    stepper.move(2000, 2000, block=True)
-#    stepper.move(-100, 1000, block=True)
+    stepper.move(2000, 1000, block=True)
+    #    stepper.move(-100, 1000, block=True)
 
-#    stepper.target_speed = 500
-#    stepper.run(1)
-#    time.sleep(10)
-#    stepper.stop(True)
+    #    stepper.target_speed = 500
+    #    stepper.run(1)
+    #    time.sleep(10)
+    #    stepper.stop(True)
 
     time.sleep(0.1)
     stepper.release()

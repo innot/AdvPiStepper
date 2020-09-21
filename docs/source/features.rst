@@ -32,11 +32,12 @@ Uses
 ....
 
 AdvPiStepper is suitable for
-* Python projects that need to accuratly control a single stepper motor
-at reasonable speeds.
-* Stepper Motor experiments
+
+* Python projects that need to accuratly control a single stepper motor at reasonable speeds.
+* Stepper motor experiments and prototyping.
 
 It is not suitable for
+
 * multi-axis stepper motor projects
 * high speeds (> 1500 steps per second)
 
