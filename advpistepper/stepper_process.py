@@ -585,7 +585,7 @@ class StepperProcess(multiprocessing.Process):
 
         self.cd.current_direction = direction
 
-        if self.params[DIRECTION_INVERT]:
+        if self.params.get(DIRECTION_INVERT):
             direction = -direction
 
         self.driver.direction = direction
@@ -702,7 +702,7 @@ class StepperProcess(multiprocessing.Process):
                 else:
                     data.current_direction = CCW
 
-                if self.params[DIRECTION_INVERT]:
+                if self.params.get(DIRECTION_INVERT):
                     self.driver.direction = -data.current_direction
                 else:
                     self.driver.direction = data.current_direction

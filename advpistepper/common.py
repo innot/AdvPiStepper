@@ -70,7 +70,8 @@ PIGPIO_PORT = "pigpio_port"
 """The port on which the pigpio daemon is listening on. Default is empty to use the default pigpio port (8888)."""
 
 DIRECTION_INVERT = "direction_invert"
-"""If true then the direction signal is inverted by the driver, i.e. Clockwise and Counterclockwise are swaped."""
+"""If this key exists then the direction signal is inverted by the driver, 
+i.e. Clockwise and Counterclockwise are swaped."""
 
 # Paramaters of the Step/Dir Driver
 DIRECTION_CHANGE_DELAY = "direction_change_delay"

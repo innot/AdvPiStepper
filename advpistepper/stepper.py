@@ -256,6 +256,19 @@ class AdvPiStepper(object):
         else:
             raise EOFError("Microstep change timed out. Maybe backend down?")
 
+    @property
+    def is_running(self) -> bool:
+        """
+        Flag to indicate that the the stepper is still running.
+
+        :return: True if the stepper engine is not idle.
+        """
+        idle = self.run_lock.acquire(block=False)  # can only be acquired when released by the backend (i.e. not busy)
+        if idle:
+            self.run_lock.release()  # release immediatly so that the backend can acquire it again.
+
+        return not idle
+
     def move(self, steps: int, speed: float = None, block: bool = False):
         """
         Move the given number of steps relative to a position.
@@ -379,6 +392,26 @@ class AdvPiStepper(object):
         self._send_cmd(Verb.HARD_STOP)
         if block:
             self._wait_for_idle()
+
+    def wait(self, timeout: float = None) -> bool:
+        """
+        Wait for the current move to finish.
+
+        When invoked with a positive, floating-point value for timeout, block for at most the
+        number of seconds specified by timeout.
+
+        .. warning::
+            If called without a timeout value while a :meth:`run` is running this method will
+            not return.
+
+        :param timeout: timeout in seconds
+        :return: `True` is the move has finished, `False` if the wait timed out.
+        """
+        idle = self.run_lock.acquire(timeout=timeout)  # wait for the backend to realease the run lock
+        if idle:
+            self.run_lock.release()  # release immediatly so that the backend can acquire it again.
+
+        return idle
 
     def zero(self):
         """

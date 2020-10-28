@@ -37,7 +37,6 @@ class MyTestCase(unittest.TestCase):
         self.apis.run(apis.CW, 1000)
         self.assertEqual(1000, self.apis.target_speed)
         self.apis.stop()
-        print("test target_speed completed")
 
     def test_current_position(self):
         print("test current_position")
@@ -66,7 +65,6 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(-50, self.apis.current_position, "wrong current_position")
 
         self.apis.close()
-        print("test move completed")
 
     def test_move_to(self):
         print("test move_to")
@@ -86,7 +84,6 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(0, self.apis.target_position, "wrong target_position")
         self.assertEqual(0, self.apis.current_position, "wrong current_position")
 
-
     def test_close(self):
         print("test close")
         self.apis.close()
@@ -94,7 +91,25 @@ class MyTestCase(unittest.TestCase):
 
         obj = apis.AdvPiStepper()
         del obj  # should not throw any errors.
-        print("test close completed")
+
+    def test_id_running(self):
+        print("test is_running")
+        self.apis.move(100)
+        self.assertTrue(self.apis.is_running)
+        self.apis.stop(block=True)
+        self.assertFalse(self.apis.is_running)
+
+    def test_wait(self):
+        print("test wait")
+        self.apis.move(100)
+        self.assertTrue(self.apis.is_running)
+        self.apis.wait()
+        self.assertFalse(self.apis.is_running)
+
+        # test timeout
+        self.apis.run(1, 100)
+        self.assertFalse(self.apis.wait(timeout=1.0))
+        self.apis.stop()
 
 
 if __name__ == '__main__':

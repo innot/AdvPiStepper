@@ -15,6 +15,7 @@ AdvPiStepper is a driver for all kinds of stepper motors, written in Python for 
    features
    requirements
    usage
+   API
 
 .. warning::
 
