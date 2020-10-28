@@ -23,21 +23,46 @@ connected to pin 23.
 Features
 ========
 * Uses acceleration and deceleration ramps.
-* Fairly tight timing up to approx. 1500 steps per second (on Raspberry Pi 4).
+* Fairly tight timing up to approx. 1500 steps per second (on Raspberry Pi 4) [#]_.
 * Complete API for relative and absolute moves, rotations and continuous running.
-* Runs in the background. Motor movement commands can be blocking or non-blocking.
+* Runs in the background. Motor movements can be blocking or non-blocking.
 * Support for microstepping (depending on the driver).
-* Support for unipolar stepper motors
-    * Like the cheap 28BYJ48 motor
+* Support for any unipolar stepper motors, like:
+    - 28BYJ-48 (very cheap geared stepper)
 * {TODO} Support for Bipolar stepper drivers / dual H-Bridges like the
-    * L293(D)
-    * DRV8833 
+    - L293(D)
+    - DRV8833
 * {TODO} Support for Step/Direction controllers like
-    * A4988 
-    * DRV8825
-    * STSPIN220 / 820
+    - A4988
+    - DRV8825
+    - STSPIN220 / 820
 * Other drivers should be easy to implement
 * Licensed under the very permissive MIT license.
+* 100% Python, no dependencies except pigpio.
+
+.. [#] At high step rates occasional stutters may occur when some
+    Python / Linux background tasks run.
+
+Uses
+----
+
+AdvPiStepper is suitable for
+
+* Python projects that need to accuratly control a single stepper motor at reasonable speeds.
+* Stepper motor experiments and prototyping.
+
+It is _not_ suitable for
+
+* multi-axis stepper motor projects
+* high speeds (> 1500 steps per second)
+
+
+Caveats
+-------
+
+* Currently no support for multiple motors. Single motor only.
+
+* 100% Python, therefore no realtime performance - jitter and stutters may occur.
 
 Requirements
 ============

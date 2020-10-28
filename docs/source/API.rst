@@ -1,8 +1,16 @@
-===================
-API
-===================
+================
+AdvPiStepper API
+================
 
 .. module:: advpistepper
 
+.. currentmodule:: advpistepper
 
-.. autoclass:: stepper
+
+
+The ``AdvPiStepper`` Class
+--------------------------
+
+.. autoclass:: AdvPiStepper(driver=None, parameters: Dict[str, Any] = None)
+    :members:
+    :undoc-members:

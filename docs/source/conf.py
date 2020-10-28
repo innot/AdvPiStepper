@@ -26,17 +26,13 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 # -- Project information -----------------------------------------------------
 
-project = 'AdvPiStepper'
+project = _setup.__project__.title()
 copyright = '2015-%s %s' % (datetime.now().year, _setup.__author__)
-author = 'Thomas Holland'
-
-# The short X.Y version
-#version = '0.9'
-# The full version, including alpha/beta/rc tags
-#release = '0.9.0.alpha'
-
+author = _setup.__author__
 version = _setup.__version__
 release = _setup.__version__
+exclude_patterns = ['_build']
+highlight_language = 'python3'
 
 # -- General configuration ---------------------------------------------------
 
@@ -83,7 +79,7 @@ language = None
 exclude_patterns = []
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = None
+pygments_style = 'sphinx'
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -91,8 +87,15 @@ pygments_style = None
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
+
+html_title = '%s %s Documentation' % (project, version)
+
 #html_theme = 'alabaster'
-html_theme = 'sphinx_rtd_theme'
+if on_rtd:
+    html_theme = 'sphinx_rtd_theme'
+else:
+    html_theme = 'sphinx_rtd_theme'
+#    html_theme = 'default'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -115,11 +118,7 @@ html_static_path = ['_static']
 #
 # html_sidebars = {}
 
-
-# -- Options for HTMLHelp output ---------------------------------------------
-
-# Output file base name for HTML help builder.
-htmlhelp_basename = 'AdvPiStepperDoc'
+htmlhelp_basename = '%sdoc' % _setup.__project__
 
 # -- Options for LaTeX output ------------------------------------------------
 
@@ -197,6 +196,8 @@ epub_exclude_files = ['search.html']
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
 
-# Autodoc options
+# -- Autodoc configuration ------------------------------------------------
+
 autodoc_member_order = 'bysource'
+#autodoc_member_order = 'groupwise'
 autodoc_typehints = 'description'
