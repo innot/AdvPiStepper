@@ -51,7 +51,9 @@ using the :mod:`28BYJ-48 <advpistepper.driver_unipolar_28byj48>` driver:
    stepper = advpistepper.AdvPiStepper(driver)
    stepper.move(100, block = True)
    stepper.move(-100)
-   while stepper.
+   while stepper.is_running:
+      pass
+   stepper.release()
 
 This example will move the stepper motor 100 steps forward, waiting for it to finish, then move
 it 100 steps backward without waiting.

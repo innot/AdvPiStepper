@@ -14,21 +14,29 @@
 #
 import os
 import sys
+from datetime import datetime
+import setup as _setup
+
 sys.path.insert(0, os.path.abspath('../../advpistepper/'))
 sys.path.insert(0, os.path.abspath('../../'))
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 # -- Project information -----------------------------------------------------
 
 project = 'AdvPiStepper'
-copyright = '2020, Thomas Holland'
+copyright = '2015-%s %s' % (datetime.now().year, _setup.__author__)
 author = 'Thomas Holland'
 
 # The short X.Y version
-version = '0.9'
+#version = '0.9'
 # The full version, including alpha/beta/rc tags
-release = '0.9.0.alpha'
+#release = '0.9.0.alpha'
 
+version = _setup.__version__
+release = _setup.__version__
 
 # -- General configuration ---------------------------------------------------
 
